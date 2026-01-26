@@ -1,0 +1,8 @@
+sounddevice
+numpy
+scipy
+groq
+pynput
+pyperclip
+pygobject
+pycairo
