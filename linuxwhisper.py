@@ -447,16 +447,39 @@ def callback(indata, frames, time_info, status):
 # ==========================================
 # 5. KEYBOARD LOGIC (F3, F4, F7, F8)
 # ==========================================
+def check_key(key, target_mode):
+    """
+    Prüft, ob die gedrückte Taste entweder die Standard-F-Taste
+    ODER die Apple/Media-Spezialtaste ist.
+    Funktioniert für alle Tastatur-Typen.
+    """
+    # 1. Standard F-Tasten (für normale Tastaturen / GitHub User)
+    if target_mode == "f3" and key == keyboard.Key.f3: return True
+    if target_mode == "f4" and key == keyboard.Key.f4: return True
+    if target_mode == "f7" and key == keyboard.Key.f7: return True
+    if target_mode == "f8" and key == keyboard.Key.f8: return True
+
+    # 2. Apple/Media-Tasten (ohne Fn-Taste zu drücken)
+    if hasattr(key, 'vk'):
+        if target_mode == "f3" and key.vk == 269025098: return True  # Expose/Mission Control
+        if target_mode == "f4" and key.vk == 269025099: return True  # Launchpad
+    
+    # 3. Media-Tasten (F7/F8 auf Apple-Tastaturen)
+    if target_mode == "f7" and key == keyboard.Key.media_previous: return True
+    if target_mode == "f8" and key == keyboard.Key.media_play_pause: return True
+
+    return False
+
+
 def on_press(key):
     global recording, stream, audio_buffer, current_mode
     if recording: return
 
-    # Check for the Mac-specific VK codes for F3 and F4
-    is_f3 = hasattr(key, 'vk') and key.vk == 269025098
-    is_f4 = hasattr(key, 'vk') and key.vk == 269025099
-    # Check for Media Previous (F7) and Play/Pause (F8)
-    is_f7 = key == keyboard.Key.media_previous
-    is_f8 = key == keyboard.Key.media_play_pause
+    # Prüfe alle Tasten mit der Helfer-Funktion (Standard + Apple)
+    is_f3 = check_key(key, "f3")
+    is_f4 = check_key(key, "f4")
+    is_f7 = check_key(key, "f7")
+    is_f8 = check_key(key, "f8")
 
     if is_f3 or is_f4 or is_f7 or is_f8:
         # Determine the mode
@@ -487,10 +510,12 @@ def on_press(key):
 
 def on_release(key):
     global recording, stream, audio_buffer
-    is_f3 = hasattr(key, 'vk') and key.vk == 269025098
-    is_f4 = hasattr(key, 'vk') and key.vk == 269025099
-    is_f7 = key == keyboard.Key.media_previous
-    is_f8 = key == keyboard.Key.media_play_pause
+    
+    # Prüfe alle Tasten mit der Helfer-Funktion (Standard + Apple)
+    is_f3 = check_key(key, "f3")
+    is_f4 = check_key(key, "f4")
+    is_f7 = check_key(key, "f7")
+    is_f8 = check_key(key, "f8")
 
     if (is_f3 or is_f4 or is_f7 or is_f8) and recording:
         recording = False
