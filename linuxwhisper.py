@@ -1530,7 +1530,11 @@ def main() -> None:
     keyboard_thread.start()
     
     # Run GTK main loop (blocks)
-    TrayManager.start()
+    try:
+        TrayManager.start()
+    except KeyboardInterrupt:
+        print("\n👋 Goodbye!")
+        os._exit(0)
 
 
 if __name__ == "__main__":
