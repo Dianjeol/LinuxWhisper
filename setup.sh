@@ -19,7 +19,7 @@ echo -e "${BLUE}📦 Installing system packages (password may be required)...${N
 sudo apt update
 sudo apt install -y python3-venv python3-pip \
                     libgirepository1.0-dev gcc libcairo2-dev pkg-config python3-dev \
-                    gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1 \
+                    gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1 gir1.2-webkit2-4.1 \
                     xdotool gnome-screenshot
 
 # 3. Create Virtual Environment
