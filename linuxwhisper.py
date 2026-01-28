@@ -873,7 +873,12 @@ def main():
     print("🚀 LinuxWhisper Running.")
     print(f"Settings: {SettingsManager.CONFIG_FILE}")
     KeyboardHandler.refresh_mappings()
-    threading.Thread(target=lambda: keyboard.Listener(on_press=KeyboardHandler.on_press, on_release=KeyboardHandler.on_release).join(), daemon=True).start()
+    # Start keyboard listener in background thread
+    def _run_listener():
+        with keyboard.Listener(on_press=KeyboardHandler.on_press, on_release=KeyboardHandler.on_release) as listener:
+            listener.join()
+    
+    threading.Thread(target=_run_listener, daemon=True).start()
     TrayManager.start()
 
 if __name__ == "__main__":
