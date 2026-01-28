@@ -656,8 +656,10 @@ CHAT_HTML_TEMPLATE = '''
   // Scroll to bottom after content loads
   setTimeout(() => {
     const chat = document.getElementById('chat');
-    if (chat) chat.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    window.scrollTo(0, document.body.scrollHeight);
+    if (document.body.scrollHeight > window.innerHeight) {
+        if (chat) chat.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        window.scrollTo(0, document.body.scrollHeight);
+    }
   }, 50);
 
   // Toggle Dropdown
