@@ -745,15 +745,11 @@ CHAT_CSS = '''
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body {
   height: 100%;
-  background: #ECE5DD;
-  font-family: -apple-system, Helvetica, Arial, sans-serif;
-  font-size: 14px;
-  overflow-x: hidden;
-  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d4cfc4' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
 }
 .pin-hint {
   position: sticky; top: 0;
-  background: #DCF8C6;
+  background: #F5F0E6;
   color: #111b21; text-align: center;
   padding: 8px 12px; font-size: 12px; font-weight: 500;
   z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
@@ -769,6 +765,7 @@ html, body {
 .dropdown-item { color: #4a5568; padding: 6px 12px; display: block; font-size: 13px; cursor: pointer; transition: background 0.1s; }
 .dropdown-item:hover { background: #f7fafc; color: #667eea; }
 .dropdown-item.selected { background: #ebf4ff; color: #5a67d8; font-weight: 600; }
+.settings-link { text-decoration: none; font-size: 14px; cursor: pointer; }
 .chat-container { display: flex; flex-direction: column; padding: 12px 10px 10px 10px; min-height: 100%; }
 .message-wrapper { display: flex; align-items: flex-start; margin-bottom: 4px; animation: fadeIn 0.3s ease-out; }
 .message-wrapper.user { justify-content: flex-end; }
@@ -978,41 +975,22 @@ class ChatOverlay(Gtk.Window):
         if status_text:
             html_messages.append(f'<div class="message status">{status_text}</div>')
         
-        # Build pin hint - always show F9 and F10 shortcuts with current state
+        # Build pin hint - simple text with gear icon
         pin_status = "F9: Unpin Chat" if is_pinned else "F9: Pin Chat"
-        voice_html = self._build_voice_html(is_tts)
-        pin_hint = f'<div class="pin-hint">{pin_status} | {voice_html}</div>'
+        voice_status = "F10: Mute" if is_tts else "F10: Voice"
+        pin_hint = f'<div class="pin-hint">{pin_status} | {voice_status} | <a href="settings://open" class="settings-link">⚙️</a></div>'
         
         html = CHAT_HTML_TEMPLATE.replace("{messages}", "\n".join(html_messages))
         html = html.replace("{pin_hint}", pin_hint)
         self.webview.load_html(html, None)
     
-    def _build_voice_html(self, is_tts: bool) -> str:
-        """Build voice dropdown HTML - always shows F10 shortcut."""
-        if not is_tts:
-            return 'F10: Turn on Voice'
-        
-        items = []
-        for v in CFG.TTS_VOICES:
-            sel = "selected" if v == STATE.tts_voice else ""
-            items.append(f'<div class="dropdown-item {sel}" onclick="window.location.href=\'voice://{v}\'">{v.title()}</div>')
-        
-        return f'''
-        <div class="dropdown">
-          <button onclick="toggleVoiceMenu()" class="voice-btn">F10: Mute | {STATE.tts_voice.title()} ▼</button>
-          <div id="voiceDropdown" class="dropdown-content">{"".join(items)}</div>
-        </div>'''
-    
     def _on_policy_decision(self, webview, decision, decision_type) -> bool:
-        """Handle voice:// URI navigation."""
+        """Handle settings:// URI navigation."""
         if decision_type == WebKit2.PolicyDecisionType.NAVIGATION_ACTION:
             nav = decision.get_navigation_action()
             uri = nav.get_request().get_uri()
-            if uri and uri.startswith("voice://"):
-                voice = uri.replace("voice://", "")
-                if voice in CFG.TTS_VOICES:
-                    STATE.tts_voice = voice
-                    ChatManager.refresh_overlay()
+            if uri and uri.startswith("settings://"):
+                GLib.idle_add(SettingsDialog.show)
                 decision.ignore()
                 return True
         return False
@@ -1045,7 +1023,109 @@ class ChatOverlay(Gtk.Window):
 
 
 # ============================================================================
-# SECTION 9: SYSTEM TRAY
+# SECTION 9: SETTINGS DIALOG
+# ============================================================================
+class SettingsDialog:
+    """GTK Settings dialog for voice and hotkey configuration."""
+    
+    _instance: Optional[Gtk.Window] = None
+    
+    @classmethod
+    def show(cls) -> None:
+        """Show settings dialog (singleton)."""
+        if cls._instance and cls._instance.get_visible():
+            cls._instance.present()
+            return
+        
+        cls._instance = cls._create_dialog()
+        cls._instance.show_all()
+    
+    @classmethod
+    def _create_dialog(cls) -> Gtk.Window:
+        """Create the settings dialog window."""
+        dialog = Gtk.Window(title="LinuxWhisper Settings")
+        dialog.set_default_size(350, 300)
+        dialog.set_resizable(False)
+        dialog.set_position(Gtk.WindowPosition.CENTER)
+        dialog.set_keep_above(True)
+        
+        # Main container
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=15)
+        vbox.set_margin_top(20)
+        vbox.set_margin_bottom(20)
+        vbox.set_margin_start(20)
+        vbox.set_margin_end(20)
+        
+        # --- Voice Section ---
+        voice_label = Gtk.Label(label="TTS Voice")
+        voice_label.set_halign(Gtk.Align.START)
+        voice_label.set_markup("<b>TTS Voice</b>")
+        vbox.pack_start(voice_label, False, False, 0)
+        
+        voice_combo = Gtk.ComboBoxText()
+        for voice in CFG.TTS_VOICES:
+            voice_combo.append_text(voice.title())
+        voice_combo.set_active(CFG.TTS_VOICES.index(STATE.tts_voice) if STATE.tts_voice in CFG.TTS_VOICES else 0)
+        voice_combo.connect("changed", cls._on_voice_changed)
+        vbox.pack_start(voice_combo, False, False, 0)
+        
+        # --- Hotkeys Section ---
+        hotkey_label = Gtk.Label()
+        hotkey_label.set_halign(Gtk.Align.START)
+        hotkey_label.set_markup("<b>Hotkeys</b>")
+        vbox.pack_start(hotkey_label, False, False, 10)
+        
+        hotkey_grid = Gtk.Grid()
+        hotkey_grid.set_column_spacing(15)
+        hotkey_grid.set_row_spacing(8)
+        
+        hotkeys = [
+            ("Dictation:", "F3"),
+            ("AI Chat:", "F4"),
+            ("Rewrite:", "F7"),
+            ("Vision:", "F8"),
+            ("Pin Chat:", "F9"),
+            ("TTS Toggle:", "F10"),
+        ]
+        
+        for i, (name, key) in enumerate(hotkeys):
+            name_label = Gtk.Label(label=name)
+            name_label.set_halign(Gtk.Align.START)
+            key_label = Gtk.Label(label=key)
+            key_label.set_halign(Gtk.Align.START)
+            key_label.get_style_context().add_class("dim-label")
+            hotkey_grid.attach(name_label, 0, i, 1, 1)
+            hotkey_grid.attach(key_label, 1, i, 1, 1)
+        
+        vbox.pack_start(hotkey_grid, False, False, 0)
+        
+        # Info label
+        info_label = Gtk.Label()
+        info_label.set_markup("<small><i>Hotkeys are fixed and cannot be changed.</i></small>")
+        info_label.set_halign(Gtk.Align.START)
+        vbox.pack_start(info_label, False, False, 10)
+        
+        # --- Close Button ---
+        close_btn = Gtk.Button(label="Close")
+        close_btn.connect("clicked", lambda w: dialog.destroy())
+        vbox.pack_end(close_btn, False, False, 0)
+        
+        dialog.add(vbox)
+        dialog.connect("destroy", lambda w: setattr(cls, '_instance', None))
+        
+        return dialog
+    
+    @staticmethod
+    def _on_voice_changed(combo: Gtk.ComboBoxText) -> None:
+        """Handle voice selection change."""
+        active = combo.get_active()
+        if 0 <= active < len(CFG.TTS_VOICES):
+            STATE.tts_voice = CFG.TTS_VOICES[active]
+            ChatManager.refresh_overlay()
+
+
+# ============================================================================
+# SECTION 10: SYSTEM TRAY
 # ============================================================================
 class TrayManager:
     """System tray (AppIndicator) management."""
@@ -1097,6 +1177,12 @@ class TrayManager:
         clear = Gtk.MenuItem(label="Clear History")
         clear.connect("activate", lambda w: HistoryManager.clear_all())
         menu.append(clear)
+        
+        # Settings
+        settings_item = Gtk.MenuItem(label="Settings")
+        settings_item.connect("activate", lambda w: SettingsDialog.show())
+        menu.append(settings_item)
+        
         menu.append(Gtk.SeparatorMenuItem())
         
         # Quit

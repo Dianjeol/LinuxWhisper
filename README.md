@@ -36,7 +36,7 @@ Configuration
 
     export GROQ_API_KEY="your_key"
 
-Get key: https://console.groq.com
+Get free key: https://console.groq.com
 
 Usage
 -----
