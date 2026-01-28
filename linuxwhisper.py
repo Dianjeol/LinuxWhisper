@@ -76,10 +76,14 @@ except ImportError:
     hotkeys.AI_CHAT = keyboard.Key.f4
     hotkeys.REWRITE = keyboard.Key.f7
     hotkeys.VISION = keyboard.Key.f8
+    hotkeys.PIN_CHAT = keyboard.Key.f9
+    hotkeys.TTS_TOGGLE = keyboard.Key.f10
     hotkeys.DICTATION_ALT = 269025098
     hotkeys.AI_CHAT_ALT = 269025099
     hotkeys.REWRITE_ALT = keyboard.Key.media_previous
     hotkeys.VISION_ALT = keyboard.Key.media_play_pause
+    hotkeys.PIN_CHAT_ALT = keyboard.Key.media_next
+    hotkeys.TTS_TOGGLE_ALT = keyboard.Key.media_volume_mute
 
 gi.require_version('Gtk', '3.0')
 gi.require_version('AyatanaAppIndicator3', '0.1')
@@ -1336,8 +1340,8 @@ class KeyboardHandler:
         "f4": [hotkeys.AI_CHAT, hotkeys.AI_CHAT_ALT],
         "f7": [hotkeys.REWRITE, hotkeys.REWRITE_ALT],
         "f8": [hotkeys.VISION, hotkeys.VISION_ALT],
-        "f9": [keyboard.Key.f9, keyboard.Key.media_next, 269025047],
-        "f10": [keyboard.Key.f10, keyboard.Key.media_volume_mute],
+        "f9": [hotkeys.PIN_CHAT, hotkeys.PIN_CHAT_ALT, 269025047],  # Keep XF86AudioNext code just in case
+        "f10": [hotkeys.TTS_TOGGLE, hotkeys.TTS_TOGGLE_ALT],
     }
     
     # Mode -> key mapping (for recording modes)
