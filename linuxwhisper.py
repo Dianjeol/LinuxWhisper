@@ -1430,22 +1430,22 @@ class KeyboardHandler:
     @classmethod
     def check_key(cls, key: Any, action: str) -> bool:
         """Check if pressed key matches configured action."""
+        # 1. Check Configured Key (or Default F-Key)
         target_str = cls.get_key_string(action)
         pressed_str = cls.serialize_key(key)
         
-        # match precise string
         if pressed_str == target_str:
             return True
             
-        # fallback for media keys if they match default F-keys
-        # (Only applies if user hasn't rebound them)
-        if target_str == cls.DEFAULTS.get(action):
-             # Backup hardcoded checks for Apple/Media keys
-             if action == "dictation" and getattr(key, 'vk', None) == 269025098: return True
-             if action == "ai" and getattr(key, 'vk', None) == 269025099: return True
+        # 2. Check Apple/Media Fallbacks ONLY if user hasn't rebound this action
+        # If user hasn't customized this specific action, allow hardware fallbacks
+        if action not in STATE.custom_hotkeys:
+             vk = getattr(key, 'vk', None)
+             if action == "dictation" and vk == 269025098: return True
+             if action == "ai" and vk == 269025099: return True
              if action == "ai_rewrite" and key == keyboard.Key.media_previous: return True
              if action == "vision" and key == keyboard.Key.media_play_pause: return True
-             if action == "pin" and (key == keyboard.Key.media_next or getattr(key, 'vk', None) == 269025047): return True
+             if action == "pin" and (key == keyboard.Key.media_next or vk == 269025047): return True
              if action == "tts" and key == keyboard.Key.media_volume_mute: return True
              
         return False
@@ -1530,11 +1530,7 @@ def main() -> None:
     keyboard_thread.start()
     
     # Run GTK main loop (blocks)
-    try:
-        TrayManager.start()
-    except KeyboardInterrupt:
-        print("\n👋 Goodbye!")
-        os._exit(0)
+    TrayManager.start()
 
 
 if __name__ == "__main__":
