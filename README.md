@@ -59,4 +59,4 @@ Click the ⚙️ icon in the chat or use "Settings" in the System Tray to change
 - TTS Voice (Diana, Hannah, etc.)
 - View Hotkeys
 
-System tray icon for history, settings, and quit.
+System tray icon for history and settings.

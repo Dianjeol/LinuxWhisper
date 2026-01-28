@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import base64
 import io
+import json
 import math
 import os
 import queue
@@ -108,6 +109,8 @@ class Config:
     TEMP_SCREEN_PATH: str = "/tmp/temp_screen.png"
     TEMP_TTS_PATH: str = "/tmp/linuxwhisper_tts.wav"
     
+    CONFIG_PATH: str = os.path.expanduser("~/.config/linuxwhisper/config.json")
+    
     # --- System Prompt ---
     SYSTEM_PROMPT: str = (
         "Act as a compassionate assistant. Base your reasoning on the principles of "
@@ -123,6 +126,26 @@ class Config:
         "ai_rewrite": {"icon": "✍️", "text": "Rewrite Mode...", "bg": "#1a1a2e", "fg": "#22c55e"},
         "vision":     {"icon": "📸", "text": "Vision Mode...",  "bg": "#1a1a2e", "fg": "#f59e0b"},
     })
+
+    def load(self) -> Dict[str, Any]:
+        """Load configuration from JSON file."""
+        if not os.path.exists(self.CONFIG_PATH):
+            return {}
+        try:
+            with open(self.CONFIG_PATH, "r") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"⚠️ Error loading config: {e}")
+            return {}
+
+    def save(self, data: Dict[str, Any]) -> None:
+        """Save configuration to JSON file."""
+        try:
+            os.makedirs(os.path.dirname(self.CONFIG_PATH), exist_ok=True)
+            with open(self.CONFIG_PATH, "w") as f:
+                json.dump(data, f, indent=4)
+        except Exception as e:
+            print(f"⚠️ Error saving config: {e}")
 
 
 # Global config instance
@@ -140,6 +163,14 @@ class AppState:
     All runtime state is centralized here for clarity and debugging.
     Reset by creating a new instance: STATE = AppState()
     """
+    def __post_init__(self):
+        """Load configuration on init."""
+        data = CFG.load()
+        if "voice" in data:
+            self.tts_voice = data["voice"]
+        if "hotkeys" in data:
+            self.custom_hotkeys = data["hotkeys"]
+    
     # --- Recording State ---
     recording: bool = False
     current_mode: Optional[str] = None
@@ -167,6 +198,9 @@ class AppState:
     # --- System Tray ---
     indicator: Optional[AppIndicator.Indicator] = None
     gtk_menu: Optional[Gtk.Menu] = None
+    
+    # --- Configuration ---
+    custom_hotkeys: Dict[str, str] = field(default_factory=dict)
 
 
 # Global state instance
@@ -1076,7 +1110,7 @@ class SettingsDialog:
         # --- Hotkeys Section ---
         hotkey_label = Gtk.Label()
         hotkey_label.set_halign(Gtk.Align.START)
-        hotkey_label.set_markup("<b>Hotkeys</b>")
+        hotkey_label.set_markup("<b>Hotkeys (Click to change)</b>")
         vbox.pack_start(hotkey_label, False, False, 10)
         
         hotkey_grid = Gtk.Grid()
@@ -1084,28 +1118,34 @@ class SettingsDialog:
         hotkey_grid.set_row_spacing(8)
         
         hotkeys = [
-            ("Dictation:", "F3"),
-            ("AI Chat:", "F4"),
-            ("Rewrite:", "F7"),
-            ("Vision:", "F8"),
-            ("Pin Chat:", "F9"),
-            ("TTS Toggle:", "F10"),
+            ("Dictation:", "dictation"),
+            ("AI Chat:", "ai"),
+            ("Rewrite:", "ai_rewrite"),
+            ("Vision:", "vision"),
+            ("Pin Chat:", "pin"),
+            ("TTS Toggle:", "tts"),
         ]
         
-        for i, (name, key) in enumerate(hotkeys):
+        cls.key_buttons = {}
+        
+        for i, (name, action) in enumerate(hotkeys):
             name_label = Gtk.Label(label=name)
             name_label.set_halign(Gtk.Align.START)
-            key_label = Gtk.Label(label=key)
-            key_label.set_halign(Gtk.Align.START)
-            key_label.get_style_context().add_class("dim-label")
+            
+            # Button showing current key
+            current_key = KeyboardHandler.get_key_string(action)
+            btn = Gtk.Button(label=current_key)
+            btn.connect("clicked", cls._on_key_click, action)
+            cls.key_buttons[action] = btn
+            
             hotkey_grid.attach(name_label, 0, i, 1, 1)
-            hotkey_grid.attach(key_label, 1, i, 1, 1)
+            hotkey_grid.attach(btn, 1, i, 1, 1)
         
         vbox.pack_start(hotkey_grid, False, False, 0)
         
         # Info label
         info_label = Gtk.Label()
-        info_label.set_markup("<small><i>Hotkeys are fixed and cannot be changed.</i></small>")
+        info_label.set_markup("<small><i>Click a button then press any key to rebind.</i></small>")
         info_label.set_halign(Gtk.Align.START)
         vbox.pack_start(info_label, False, False, 10)
         
@@ -1124,8 +1164,56 @@ class SettingsDialog:
         """Handle voice selection change."""
         active = combo.get_active()
         if 0 <= active < len(CFG.TTS_VOICES):
-            STATE.tts_voice = CFG.TTS_VOICES[active]
+            voice = CFG.TTS_VOICES[active]
+            STATE.tts_voice = voice
             ChatManager.refresh_overlay()
+            
+            # Save config
+            config = CFG.load()
+            config["voice"] = voice
+            CFG.save(config)
+
+    @classmethod
+    def _on_key_click(cls, btn: Gtk.Button, action: str) -> None:
+        """Handle key binding button click."""
+        btn.set_label("Press any key...")
+        btn.set_sensitive(False)
+        
+        # Start capture thread
+        threading.Thread(target=cls._capture_key, args=(btn, action), daemon=True).start()
+
+    @classmethod
+    def _capture_key(cls, btn: Gtk.Button, action: str) -> None:
+        """Capture next key press for binding."""
+        captured_key = None
+        
+        def on_press(key):
+            nonlocal captured_key
+            captured_key = key
+            return False  # Stop listener
+            
+        with keyboard.Listener(on_press=on_press) as listener:
+            listener.join()
+            
+        if captured_key:
+            key_str = KeyboardHandler.serialize_key(captured_key)
+            
+            # Update state
+            STATE.custom_hotkeys[action] = key_str
+            
+            # Update UI on main thread
+            GLib.idle_add(lambda: cls._update_btn(btn, key_str))
+            
+            # Save config
+            config = CFG.load()
+            config["hotkeys"] = STATE.custom_hotkeys
+            CFG.save(config)
+
+    @staticmethod
+    def _update_btn(btn: Gtk.Button, text: str) -> None:
+        """Update button text and sensitivity safely."""
+        btn.set_label(text)
+        btn.set_sensitive(True)
 
 
 # ============================================================================
@@ -1313,41 +1401,60 @@ class ModeHandler:
 # SECTION 11: KEYBOARD HANDLER
 # ============================================================================
 class KeyboardHandler:
-    """Global keyboard listener with data-driven key mappings."""
+    """Global keyboard listener with dynamic key mappings."""
     
-    # Key mappings: mode -> list of valid keys/vk codes
-    KEY_MAPPINGS: Dict[str, List[Any]] = {
-        "f3": [keyboard.Key.f3, 269025098],  # + Mission Control vk
-        "f4": [keyboard.Key.f4, 269025099],  # + Launchpad vk
-        "f7": [keyboard.Key.f7, keyboard.Key.media_previous],
-        "f8": [keyboard.Key.f8, keyboard.Key.media_play_pause],
-        "f9": [keyboard.Key.f9, keyboard.Key.media_next, 269025047],
-        "f10": [keyboard.Key.f10, keyboard.Key.media_volume_mute],
-    }
-    
-    # Mode -> key mapping (for recording modes)
-    MODE_KEYS: Dict[str, str] = {
-        "dictation": "f3",
-        "ai": "f4",
-        "ai_rewrite": "f7",
-        "vision": "f8",
+    # Default mappings as fallback
+    DEFAULTS: Dict[str, str] = {
+        "dictation": "Key.f3",
+        "ai": "Key.f4",
+        "ai_rewrite": "Key.f7",
+        "vision": "Key.f8",
+        "pin": "Key.f9",
+        "tts": "Key.f10",
     }
     
     @classmethod
-    def check_key(cls, key, target: str) -> bool:
-        """Check if pressed key matches target mode."""
-        mappings = cls.KEY_MAPPINGS.get(target, [])
-        if key in mappings:
+    def get_key_string(cls, action: str) -> str:
+        """Get configured key string for action."""
+        return STATE.custom_hotkeys.get(action, cls.DEFAULTS[action])
+
+    @staticmethod
+    def serialize_key(key: Any) -> str:
+        """Convert pynput Key object to string storage format."""
+        if hasattr(key, 'name'):
+            return f"Key.{key.name}"
+        if hasattr(key, 'char') and key.char:
+            return key.char
+        return str(key)
+        
+    @classmethod
+    def check_key(cls, key: Any, action: str) -> bool:
+        """Check if pressed key matches configured action."""
+        target_str = cls.get_key_string(action)
+        pressed_str = cls.serialize_key(key)
+        
+        # match precise string
+        if pressed_str == target_str:
             return True
-        if hasattr(key, 'vk') and key.vk in mappings:
-            return True
+            
+        # fallback for media keys if they match default F-keys
+        # (Only applies if user hasn't rebound them)
+        if target_str == cls.DEFAULTS.get(action):
+             # Backup hardcoded checks for Apple/Media keys
+             if action == "dictation" and getattr(key, 'vk', None) == 269025098: return True
+             if action == "ai" and getattr(key, 'vk', None) == 269025099: return True
+             if action == "ai_rewrite" and key == keyboard.Key.media_previous: return True
+             if action == "vision" and key == keyboard.Key.media_play_pause: return True
+             if action == "pin" and (key == keyboard.Key.media_next or getattr(key, 'vk', None) == 269025047): return True
+             if action == "tts" and key == keyboard.Key.media_volume_mute: return True
+             
         return False
     
     @classmethod
-    def get_mode_for_key(cls, key) -> Optional[str]:
+    def get_mode_for_key(cls, key: Any) -> Optional[str]:
         """Get mode name for a pressed key, if any."""
-        for mode, key_name in cls.MODE_KEYS.items():
-            if cls.check_key(key, key_name):
+        for mode in ["dictation", "ai", "ai_rewrite", "vision"]:
+            if cls.check_key(key, mode):
                 return mode
         return None
     
@@ -1358,12 +1465,12 @@ class KeyboardHandler:
             return
         
         # F9: Toggle pin (non-recording action)
-        if cls.check_key(key, "f9"):
+        if cls.check_key(key, "pin"):
             ChatManager.toggle_pin()
             return
         
         # F10: Toggle TTS (non-recording action)
-        if cls.check_key(key, "f10"):
+        if cls.check_key(key, "tts"):
             TTSService.toggle()
             return
         
