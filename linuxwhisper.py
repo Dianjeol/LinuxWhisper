@@ -603,21 +603,25 @@ class ChatOverlay(Gtk.Window):
         self.add(self.webview)
         
         self.opacity = 0.0; self.fade_timer = None; self.on_fade_end = None
+        self.fade_in_active = False; self.fade_out_active = False
         self.start_fade_in()
         self.show_all()
 
     def start_fade_in(self):
         self._stop_fade(); self.fade_in = True
+        self.fade_in_active = True; self.fade_out_active = False
         self.fade_timer = GLib.timeout_add(16, self._step_fade)
 
     def start_fade_out(self, callback=None):
         self._stop_fade(); self.fade_in = False; self.on_fade_end = callback
+        self.fade_in_active = False; self.fade_out_active = True
         self.fade_timer = GLib.timeout_add(16, self._step_fade)
 
     def _step_fade(self):
         self.opacity += 0.1 if self.fade_in else -0.1
         self.set_opacity(max(0.0, min(1.0, self.opacity)))
         if (self.fade_in and self.opacity >= 1) or (not self.fade_in and self.opacity <= 0):
+            self.fade_in_active = False; self.fade_out_active = False
             if not self.fade_in and self.on_fade_end: self.on_fade_end()
             self.fade_timer = None; return False
         return True
