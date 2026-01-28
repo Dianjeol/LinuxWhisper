@@ -745,11 +745,15 @@ CHAT_CSS = '''
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body {
   height: 100%;
-  background: #FFFFFF;
+  background: #ECE5DD;
+  font-family: -apple-system, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  overflow-x: hidden;
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d4cfc4' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
 }
 .pin-hint {
   position: sticky; top: 0;
-  background: #F5F0E6;
+  background: #D1D9E6;
   color: #111b21; text-align: center;
   padding: 8px 12px; font-size: 12px; font-weight: 500;
   z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.15);

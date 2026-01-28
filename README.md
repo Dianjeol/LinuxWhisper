@@ -52,6 +52,11 @@ Hotkeys:
 | F7 | Rewrite (select → hold → speak → release) |
 | F8 | Vision (screenshot + AI) |
 | F9 | Pin/Unpin chat overlay |
-| F10 | Toggle TTS |
+| F10 | Toggle TTS / Mute |
 
-System tray icon for history and quit.
+**Settings:**
+Click the ⚙️ icon in the chat or use "Settings" in the System Tray to change:
+- TTS Voice (Diana, Hannah, etc.)
+- View Hotkeys
+
+System tray icon for history, settings, and quit.
