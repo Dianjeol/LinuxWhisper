@@ -745,7 +745,7 @@ CHAT_CSS = '''
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body {
   height: 100%;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background: #FFFFFF;
 }
 .pin-hint {
   position: sticky; top: 0;
