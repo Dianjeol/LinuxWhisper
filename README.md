@@ -55,9 +55,8 @@ Hotkeys:
 | F10 | Toggle TTS / Mute |
 
 **Settings:**
-All hotkeys and voice preferences can be changed directly in the **Settings Dialog**.
-- Click the ⚙️ icon in the chat overlay.
-- Or select "Settings" from the System Tray.
-- Values are saved to `~/.config/linuxwhisper/settings.json`.
+Click the ⚙️ icon in the chat or use "Settings" in the System Tray to change:
+- TTS Voice (Diana, Hannah, etc.)
+- View Hotkeys
 
-System tray icon for history, settings, and quit.
+System tray icon for history and settings.
