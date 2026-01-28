@@ -57,6 +57,6 @@ Hotkeys:
 **Settings:**
 Click the ⚙️ icon in the chat or use "Settings" in the System Tray to change:
 - TTS Voice (Diana, Hannah, etc.)
-- View Hotkeys
+- View Hotkeys (Edit `hotkeys.py` to change them)
 
 System tray icon for history and settings.

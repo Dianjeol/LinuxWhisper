@@ -1102,21 +1102,24 @@ class SettingsDialog:
         hotkey_grid.set_column_spacing(15)
         hotkey_grid.set_row_spacing(8)
         
-        hotkeys = [
-            ("Dictation:", "F3"),
-            ("AI Chat:", "F4"),
-            ("Rewrite:", "F7"),
-            ("Vision:", "F8"),
-            ("Pin Chat:", "F9"),
-            ("TTS Toggle:", "F10"),
+        hotkeys_list = [
+            ("Dictation:", hotkeys.DICTATION),
+            ("AI Chat:", hotkeys.AI_CHAT),
+            ("Rewrite:", hotkeys.REWRITE),
+            ("Vision:", hotkeys.VISION),
+            ("Pin Chat:", hotkeys.PIN_CHAT),
+            ("TTS Toggle:", hotkeys.TTS_TOGGLE),
         ]
         
-        for i, (name, key) in enumerate(hotkeys):
+        for i, (name, key) in enumerate(hotkeys_list):
             name_label = Gtk.Label(label=name)
             name_label.set_halign(Gtk.Align.START)
-            key_label = Gtk.Label(label=key)
+            
+            key_name = cls._get_key_name(key)
+            key_label = Gtk.Label(label=key_name)
             key_label.set_halign(Gtk.Align.START)
             key_label.get_style_context().add_class("dim-label")
+            
             hotkey_grid.attach(name_label, 0, i, 1, 1)
             hotkey_grid.attach(key_label, 1, i, 1, 1)
         
@@ -1124,7 +1127,7 @@ class SettingsDialog:
         
         # Info label
         info_label = Gtk.Label()
-        info_label.set_markup("<small><i>Hotkeys are fixed and cannot be changed.</i></small>")
+        info_label.set_markup("<small><i>Change hotkeys in <b>hotkeys.py</b></i></small>")
         info_label.set_halign(Gtk.Align.START)
         vbox.pack_start(info_label, False, False, 10)
         
@@ -1138,6 +1141,13 @@ class SettingsDialog:
         
         return dialog
     
+    @staticmethod
+    def _get_key_name(key: Any) -> str:
+        """Format key object to readable string."""
+        if hasattr(key, 'name'):
+            return key.name.upper()
+        return str(key).replace('Key.', '').upper()
+
     @staticmethod
     def _on_voice_changed(combo: Gtk.ComboBoxText) -> None:
         """Handle voice selection change."""
