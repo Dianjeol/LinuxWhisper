@@ -7,6 +7,7 @@ Integrates Groq APIs for transcription, chat, rewriting, and vision.
 Features
 --------
 
+- **Wake Word**: Say "Alexa" to trigger AI Chat hands-free.
 - **Dictation (F3)**: Speech-to-text using Whisper V3.
 - **AI Chat (F4)**: Context-aware Q&A using Moonshot Kimi.
 - **Smart Rewrite (F7)**: Highlight text, speak to rewrite.
@@ -42,6 +43,11 @@ Usage
 -----
 
     ./venv/bin/python linuxwhisper.py
+
+
+**Wake Word:**
+Simply say **"Alexa"** to start the AI Chat. The recording will stop automatically after 1.5s of silence.
+*(Model (~5MB) is downloaded automatically on first run)*
 
 Hotkeys:
 
