@@ -6,3 +6,5 @@ pynput
 pyperclip
 pygobject
 pycairo
+openwakeword
+onnxruntime
