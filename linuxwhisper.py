@@ -112,7 +112,7 @@ class Config:
     TEMP_TTS_PATH: str = "/tmp/linuxwhisper_tts.wav"
     
     # --- Wake Word Settings ---
-    WAKE_WORD_MODEL: str = "hey_zelda"
+    WAKE_WORD_MODEL: str = "hey_lara"
     WAKE_WORD_THRESHOLD: float = 0.5
     SILENCE_THRESHOLD: float = 0.01  # RMS amplitude threshold
     SILENCE_DURATION: float = 1.5    # Seconds of silence to stop recording
