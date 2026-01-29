@@ -37,6 +37,9 @@ echo -e "${BLUE}⬇️  Installing Python requirements...${NC}"
 
 # 5. Success Message
 echo -e "${GREEN}✅ Installation complete!${NC}"
+echo -e "${BLUE}🔒 Setting permissions for multi-user access...${NC}"
+chmod -R a+rX venv
+
 echo ""
 echo "To run LinuxWhisper:"
 echo "  1. Set your API key (see README.md)"

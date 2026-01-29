@@ -182,6 +182,8 @@ class AppState:
     # --- TTS ---
     tts_enabled: bool = True  # Enabled by default
     tts_voice: str = CFG.TTS_DEFAULT_VOICE
+    tts_enabled: bool = True  # Enabled by default
+    tts_voice: str = CFG.TTS_DEFAULT_VOICE
     
     # --- System Tray ---
     indicator: Optional[AppIndicator.Indicator] = None
@@ -416,9 +418,11 @@ class WakeWordService:
                     dtype='int16'
                 ) as stream:
                     # Flush startup buffer (approx 0.5s) to prevent ghost triggers
-                    for _ in range(10):
+                    for _ in range(20):
                         if STATE.recording: break
                         stream.read(1280)
+                    
+                    warmup_chunks = 15  # Ignore first ~1.2s of predictions
                         
                     while STATE.wake_word_running.is_set():
                         # Check if we switched to recording mode
@@ -435,6 +439,11 @@ class WakeWordService:
                             
                         # Feed to model
                         prediction = oww_model.predict(data)
+                        
+                        # WARMUP: Ignore first 10 chunks (approx 1s) to let audio stabilize
+                        if warmup_chunks > 0:
+                            warmup_chunks -= 1
+                            continue
                         
                         # Check for activation using fuzzy key matching
                         found_score = 0.0
@@ -1544,15 +1553,7 @@ class ModeHandler:
         STATE.voice_triggered = False  # Reset flag
         
         if audio_data is not None:
-             # Process in background to not block UI? 
-             # Actually ModeHandler.process calls APIs which block. 
-             # We should probably run processing in a separate thread if we want UI to be responsive.
-             # But for now, let's keep it simple as per original design (blocks GTK... wait, original runs on main thread?)
-             # Original design: KeyboardHandler runs on thread, calls on_release -> stop_recording -> process.
-             # process calls AIService which does API calls.
-             # KeyboardHandler runs in a thread, so it blocks *that* thread, not GTK main thread.
-             # So we must ensure we run process in a background thread!
-             
+             # Process in background
              threading.Thread(
                  target=ModeHandler._process_worker,
                  args=(STATE.current_mode, audio_data),
@@ -1562,7 +1563,12 @@ class ModeHandler:
     @staticmethod
     def _process_worker(mode: str, audio_data: np.ndarray) -> None:
         """Worker thread for processing audio."""
-        transcribed = AudioService.transcribe(audio_data)
+        transcribed = None
+        try:
+            transcribed = AudioService.transcribe(audio_data)
+        except Exception:
+            pass
+            
         if transcribed:
              # Run processing (API calls etc)
              GLib.idle_add(lambda: ModeHandler.process(mode, transcribed))
@@ -1570,6 +1576,15 @@ class ModeHandler:
     @staticmethod
     def process(mode: str, transcribed_text: str) -> None:
         """Route to appropriate handler based on mode."""
+        # --- Hallucination Guard ---
+        # Whisper often outputs "Thank you", "You're welcome", or "Subtitle" on silence.
+        # We filter these out to prevent weird loops.
+        clean = transcribed_text.strip().lower().replace(".", "").replace("!", "")
+        hallucinations = {"thank you", "you're welcome", "thanks", "subtitle", "untertitel", "you"}
+        if clean in hallucinations or len(clean) < 2:
+            print(f"⚠️ Ignored Hallucination: '{transcribed_text}'")
+            return
+
         handlers = {
             "dictation": ModeHandler._handle_dictation,
             "ai": ModeHandler._handle_ai,
