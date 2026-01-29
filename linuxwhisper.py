@@ -124,6 +124,16 @@ class Config:
         "vision":     {"icon": "📸", "text": "Vision Mode...",  "bg": "#1a1a2e", "fg": "#f59e0b"},
     })
 
+    # format: "id": (Label_fuer_UI, Primary_Key, List_of_Extra_VKs_or_MediaKeys)
+    HOTKEY_DEFS: Dict[str, Tuple[str, Any, List[Any]]] = field(default_factory=lambda: {
+        "dictation":  ("F3",  keyboard.Key.f3, [269025098]),
+        "ai":         ("F4",  keyboard.Key.f4, [269025099]),
+        "ai_rewrite": ("F7",  keyboard.Key.f7, [keyboard.Key.media_previous]),
+        "vision":     ("F8",  keyboard.Key.f8, [keyboard.Key.media_play_pause]),
+        "pin":        ("F9",  keyboard.Key.f9, [269025047, keyboard.Key.media_next]),
+        "tts":        ("F10", keyboard.Key.f10, [keyboard.Key.media_volume_mute]),
+    })
+
 
 # Global config instance
 CFG = Config()
@@ -980,8 +990,10 @@ class ChatOverlay(Gtk.Window):
             html_messages.append(f'<div class="message status">{status_text}</div>')
         
         # Build pin hint - simple text with gear icon
-        pin_status = "F9: Unpin Chat" if is_pinned else "F9: Pin Chat"
-        voice_status = "F10: Mute" if is_tts else "F10: Voice"
+        pin_label = CFG.HOTKEY_DEFS["pin"][0]
+        tts_label = CFG.HOTKEY_DEFS["tts"][0]
+        pin_status = f"{pin_label}: Unpin Chat" if is_pinned else f"{pin_label}: Pin Chat"
+        voice_status = f"{tts_label}: Mute" if is_tts else f"{tts_label}: Voice"
         pin_hint = f'<div class="pin-hint">{pin_status} | {voice_status} | <a href="settings://open" class="settings-link">⚙️</a></div>'
         
         html = CHAT_HTML_TEMPLATE.replace("{messages}", "\n".join(html_messages))
@@ -1083,14 +1095,19 @@ class SettingsDialog:
         hotkey_grid.set_column_spacing(15)
         hotkey_grid.set_row_spacing(8)
         
-        hotkeys = [
-            ("Dictation:", "F3"),
-            ("AI Chat:", "F4"),
-            ("Rewrite:", "F7"),
-            ("Vision:", "F8"),
-            ("Pin Chat:", "F9"),
-            ("TTS Toggle:", "F10"),
-        ]
+        hotkeys = []
+        display_names = {
+            "dictation": "Dictation:",
+            "ai": "AI Chat:",
+            "ai_rewrite": "Rewrite:",
+            "vision": "Vision:",
+            "pin": "Pin Chat:",
+            "tts": "TTS Toggle:",
+        }
+        
+        for mode_id, (label, _, _) in CFG.HOTKEY_DEFS.items():
+            name = display_names.get(mode_id, mode_id.replace("_", " ").title() + ":")
+            hotkeys.append((name, label))
         
         for i, (name, key) in enumerate(hotkeys):
             name_label = Gtk.Label(label=name)
@@ -1315,39 +1332,28 @@ class ModeHandler:
 class KeyboardHandler:
     """Global keyboard listener with data-driven key mappings."""
     
-    # Key mappings: mode -> list of valid keys/vk codes
+    # Generate mappings dynamically from CFG.HOTKEY_DEFS
+    # Format: mode_id -> list of all valid keys (primary + extras)
     KEY_MAPPINGS: Dict[str, List[Any]] = {
-        "f3": [keyboard.Key.f3, 269025098],  # + Mission Control vk
-        "f4": [keyboard.Key.f4, 269025099],  # + Launchpad vk
-        "f7": [keyboard.Key.f7, keyboard.Key.media_previous],
-        "f8": [keyboard.Key.f8, keyboard.Key.media_play_pause],
-        "f9": [keyboard.Key.f9, keyboard.Key.media_next, 269025047],
-        "f10": [keyboard.Key.f10, keyboard.Key.media_volume_mute],
-    }
-    
-    # Mode -> key mapping (for recording modes)
-    MODE_KEYS: Dict[str, str] = {
-        "dictation": "f3",
-        "ai": "f4",
-        "ai_rewrite": "f7",
-        "vision": "f8",
+        mode_id: [data[1]] + data[2]
+        for mode_id, data in CFG.HOTKEY_DEFS.items()
     }
     
     @classmethod
-    def check_key(cls, key, target: str) -> bool:
+    def check_key(cls, key, target_mode: str) -> bool:
         """Check if pressed key matches target mode."""
-        mappings = cls.KEY_MAPPINGS.get(target, [])
-        if key in mappings:
+        valid_keys = cls.KEY_MAPPINGS.get(target_mode, [])
+        if key in valid_keys:
             return True
-        if hasattr(key, 'vk') and key.vk in mappings:
+        if hasattr(key, 'vk') and key.vk in valid_keys:
             return True
         return False
     
     @classmethod
     def get_mode_for_key(cls, key) -> Optional[str]:
         """Get mode name for a pressed key, if any."""
-        for mode, key_name in cls.MODE_KEYS.items():
-            if cls.check_key(key, key_name):
+        for mode in CFG.MODES:
+            if cls.check_key(key, mode):
                 return mode
         return None
     
@@ -1357,13 +1363,13 @@ class KeyboardHandler:
         if STATE.recording:
             return
         
-        # F9: Toggle pin (non-recording action)
-        if cls.check_key(key, "f9"):
+        # Pin toggle (non-recording action)
+        if cls.check_key(key, "pin"):
             ChatManager.toggle_pin()
             return
         
-        # F10: Toggle TTS (non-recording action)
-        if cls.check_key(key, "f10"):
+        # TTS toggle (non-recording action)
+        if cls.check_key(key, "tts"):
             TTSService.toggle()
             return
         
@@ -1387,15 +1393,14 @@ class KeyboardHandler:
             return
         
         # Check if released key matches current mode
-        mode = cls.get_mode_for_key(key)
-        if mode and mode == STATE.current_mode:
+        if cls.check_key(key, STATE.current_mode):
             OverlayManager.hide()
             audio_data = AudioService.stop_recording()
             
             if audio_data is not None:
                 transcribed = AudioService.transcribe(audio_data)
                 if transcribed:
-                    ModeHandler.process(mode, transcribed)
+                    ModeHandler.process(STATE.current_mode, transcribed)
     
     @classmethod
     def run(cls) -> None:
@@ -1410,12 +1415,21 @@ class KeyboardHandler:
 def main() -> None:
     """Application entry point."""
     print("🚀 LinuxWhisper is running.")
-    print(" 1. F3            : Live dictation at cursor position (Whisper V3)")
-    print(" 2. F4            : Empathic AI question (Groq Moonshot)")
-    print(" 3. F7 (Previous) : Smart Rewrite - Highlight text & speak to edit")
-    print(" 4. F8 (Play)     : Empathic Vision / Screenshot (Groq Llama 4)")
-    print(" 5. F9 (Next)     : Toggle Chat Overlay Pin Mode")
-    print(" 6. F10           : Toggle TTS (Read AI responses aloud)")
+    
+    descriptions = {
+        "dictation": "Live dictation at cursor position (Whisper V3)",
+        "ai": "Empathic AI question (Groq Moonshot)",
+        "ai_rewrite": "Smart Rewrite - Highlight text & speak to edit",
+        "vision": "Empathic Vision / Screenshot (Groq Llama 4)",
+        "pin": "Toggle Chat Overlay Pin Mode",
+        "tts": "Toggle TTS (Read AI responses aloud)"
+    }
+    
+    i = 1
+    for mode_id, (label, _, _) in CFG.HOTKEY_DEFS.items():
+         desc = descriptions.get(mode_id, "Unknown Mode")
+         print(f" {i}. {label:<13}: {desc}")
+         i += 1
     print("\n📌 System tray icon active")
     
     # Start keyboard listener in background thread
