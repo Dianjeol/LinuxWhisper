@@ -177,10 +177,14 @@ class AppState:
     # --- System Tray ---
     indicator: Optional[AppIndicator.Indicator] = None
     gtk_menu: Optional[Gtk.Menu] = None
+    
+    # --- UI Persistence ---
+    last_chat_position: Optional[Tuple[int, int]] = None
 
 
 # Global state instance
 STATE = AppState()
+
 
 
 # ============================================================================
@@ -755,111 +759,196 @@ CHAT_CSS = '''
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body {
   height: 100%;
-  background: #ECE5DD;
-  font-family: -apple-system, Helvetica, Arial, sans-serif;
+  background: transparent !important;
+  font-family: 'Inter', 'Ubuntu', system-ui, -apple-system, sans-serif;
+  color: #e2e8f0;
   font-size: 14px;
-  overflow-x: hidden;
-  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d4cfc4' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  line-height: 1.6;
+  overflow: hidden; /* Hide native window scrollbar */
 }
+
+/* Rounded Glass Window Container */
+.chat-window {
+  display: flex; 
+  flex-direction: column;
+  height: 100%;
+  background-color: rgba(20, 20, 25, 0.75);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  margin: 0; position: relative;
+}
+
+/* Drag Handle */
+.drag-handle {
+  position: absolute; top: 0; left: 0; width: 100%; height: 60px;
+  z-index: 5; cursor: move; -webkit-app-region: drag;
+}
+
+/* Scroll Area */
+.chat-scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  padding-bottom: 10px;
+  z-index: 10; /* Above drag handle */
+  position: relative;
+}
+/* Custom Scrollbar for inner area */
+.chat-scroll-area::-webkit-scrollbar { width: 6px; }
+.chat-scroll-area::-webkit-scrollbar-track { background: transparent; }
+.chat-scroll-area::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 3px; }
+.chat-scroll-area::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.25); }
+
+/* HUD / Pin Hint - Static Header */
 .pin-hint {
-  position: sticky; top: 0;
-  background: #D1D9E6;
-  color: #111b21; text-align: center;
-  padding: 8px 12px; font-size: 12px; font-weight: 500;
-  z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  border-radius: 0 0 12px 12px; margin: 0 20px 10px 20px;
+  flex-shrink: 0; /* Keep it fixed height */
+  width: fit-content;
+  margin: 12px auto 4px auto;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: #94a3b8;
+  padding: 5px 14px;
+  font-size: 11px; font-weight: 600;
+  border-radius: 20px;
+  z-index: 20; /* Above drag handle */
+  display: flex; gap: 10px; align-items: center; justify-content: center;
+  transition: opacity 0.3s;
+  cursor: default; position: relative;
 }
-.pin-hint kbd { background: rgba(0,0,0,0.1); padding: 2px 6px; border-radius: 4px; font-family: inherit; font-weight: 600; }
-.voice-btn { background: rgba(0,0,0,0.1); border: none; color: #111b21; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
-.voice-btn:hover { background: rgba(0,0,0,0.15); }
-.dropdown { position: relative; display: inline-block; }
-.dropdown-content { display: none; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); background: white; min-width: 100px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); border-radius: 8px; z-index: 1000; margin-top: 6px; padding: 4px 0; }
-.dropdown-content.show { display: block; animation: slideDown 0.2s ease; }
-@keyframes slideDown { from { opacity: 0; transform: translate(-50%, -10px); } to { opacity: 1; transform: translate(-50%, 0); } }
-.dropdown-item { color: #4a5568; padding: 6px 12px; display: block; font-size: 13px; cursor: pointer; transition: background 0.1s; }
-.dropdown-item:hover { background: #f7fafc; color: #667eea; }
-.dropdown-item.selected { background: #ebf4ff; color: #5a67d8; font-weight: 600; }
-.settings-link { text-decoration: none; font-size: 14px; cursor: pointer; }
-.chat-container { display: flex; flex-direction: column; padding: 12px 10px 10px 10px; min-height: 100%; }
-.message-wrapper { display: flex; align-items: flex-start; margin-bottom: 4px; animation: fadeIn 0.3s ease-out; }
+.pin-hint a { color: inherit; text-decoration: none; opacity: 0.8; transition: opacity 0.2s; cursor: pointer; }
+.pin-hint a:hover { opacity: 1; color: #fff; }
+
+/* Chat Content */
+.chat-container {
+  display: flex; flex-direction: column;
+  padding: 10px 16px 20px 16px;
+}
+
+/* Messages */
+.message-wrapper {
+  display: flex;
+  margin-bottom: 14px;
+  animation: slideFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+  transform: translateY(15px);
+}
 .message-wrapper.user { justify-content: flex-end; }
 .message-wrapper.assistant { justify-content: flex-start; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-.message { max-width: 80%; padding: 6px 10px 8px; border-radius: 7.5px; position: relative; word-wrap: break-word; box-shadow: 0 1px 0.5px rgba(0,0,0,0.13); }
-.user .message { background: #DCF8C6; border-top-right-radius: 0; margin-right: 8px; }
-.user .message::after { content: ''; position: absolute; right: -8px; top: 0; border-width: 0 0 10px 8px; border-style: solid; border-color: transparent transparent transparent #DCF8C6; }
-.assistant .message { background: #FFFFFF; border-top-left-radius: 0; margin-left: 8px; }
-.assistant .message::before { content: ''; position: absolute; left: -8px; top: 0; border-width: 0 8px 10px 0; border-style: solid; border-color: transparent #FFFFFF transparent transparent; }
-.copy-btn { background: none; border: none; cursor: pointer; padding: 4px 6px; opacity: 0.35; transition: opacity 0.2s, transform 0.1s; align-self: flex-start; margin-top: 4px; display: flex; align-items: center; justify-content: center; }
-.copy-btn svg { width: 16px; height: 16px; fill: #54656f; }
-.copy-btn:hover { opacity: 1; transform: scale(1.1); }
-.copy-btn.copied { opacity: 1; }
-.copy-btn.copied svg { fill: #25D366; }
+
+@keyframes slideFadeIn {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.message {
+  max-width: 86%;
+  padding: 10px 16px;
+  border-radius: 14px;
+  position: relative;
+  word-wrap: break-word;
+}
+
+/* User Bubble - Subtler Slate Gradient */
+.user .message {
+  background: linear-gradient(135deg, #475569 0%, #334155 100%);
+  color: #f1f5f9;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Assistant Bubble */
+.assistant .message {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+}
+
+/* Copy Button */
+.copy-btn {
+  background: none; border: none; cursor: pointer;
+  padding: 6px; margin: 0 4px;
+  opacity: 0.6; /* Always visible */
+  transition: opacity 0.2s;
+  align-self: center;
+  color: #64748b;
+  z-index: 20; /* Ensure Clickable */
+}
+.message-wrapper:hover .copy-btn { opacity: 1; }
+.copy-btn:hover { opacity: 1; color: #e2e8f0; transform: scale(1.05); }
+.copy-btn svg { width: 15px; height: 15px; fill: currentColor; }
+.copy-btn.copied { opacity: 1; color: #4ade80; }
 .user .copy-btn { order: -1; }
-.status { align-self: center; background: rgba(255,255,255,0.9); color: #667781; font-size: 12px; padding: 4px 12px; border-radius: 7px; margin: 8px 0; box-shadow: 0 1px 0.5px rgba(0,0,0,0.1); }
-.text { color: #111b21; line-height: 1.45; }
-.text code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 4px; font-family: 'SF Mono', Monaco, 'Courier New', monospace; font-size: 13px; color: #c7254e; }
-.text pre { background: #1e1e1e; color: #d4d4d4; padding: 10px 12px; border-radius: 8px; overflow-x: auto; margin: 6px 0; font-family: 'SF Mono', Monaco, 'Courier New', monospace; font-size: 12px; line-height: 1.4; }
-.text pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
-.text strong { font-weight: 600; }
-.text em { font-style: italic; }
+
+.text code {
+  background: rgba(0,0,0,0.3); padding: 2px 5px; border-radius: 4px;
+  font-family: 'SF Mono', monospace; font-size: 0.9em; color: #f87171;
+}
+.text pre {
+  background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05);
+  color: #cbd5e1; padding: 12px; border-radius: 10px;
+  overflow-x: auto; margin: 8px 0; font-family: 'SF Mono', monospace;
+  font-size: 0.85em;
+}
+.text strong { font-weight: 600; color: #fff; }
+.status {
+  align-self: center; background: rgba(255,255,255,0.05); color: #94a3b8;
+  font-size: 11px; padding: 3px 10px; border-radius: 10px;
+  margin: 10px 0; border: 1px solid rgba(255,255,255,0.05);
+}
 '''
 
 CHAT_JS = '''
 const copyIcon = '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
 const checkIcon = '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
 
-function copyText(btn, id) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  const text = el.innerText;
-  const copyPromise = navigator.clipboard ?
-    navigator.clipboard.writeText(text) :
-    new Promise((resolve, reject) => {
-      const ta = document.createElement('textarea');
-      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
-      document.body.appendChild(ta); ta.select();
-      try { document.execCommand('copy') ? resolve() : reject(); }
-      catch(e) { reject(e); }
-      document.body.removeChild(ta);
-    });
-  copyPromise.then(() => {
-    btn.innerHTML = checkIcon; btn.classList.add('copied');
-    setTimeout(() => { btn.innerHTML = copyIcon; btn.classList.remove('copied'); }, 1500);
-  }).catch(() => {});
+function copyText(btn, index) {
+  // Use custom protocol to let Python handle clipboard safely
+  window.location.href = "copy://" + index;
+  
+  // Optimistic UI update
+  btn.innerHTML = checkIcon;
+  btn.classList.add('copied');
+  setTimeout(() => { btn.innerHTML = copyIcon; btn.classList.remove('copied'); }, 1500);
 }
 
-setTimeout(() => {
-  const chat = document.getElementById('chat');
-  const assistantMessages = document.querySelectorAll('.message-wrapper.assistant');
-  // Only scroll if there are 2+ assistant responses
-  if (assistantMessages.length >= 2 && document.body.scrollHeight > window.innerHeight) {
-    if (chat) chat.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    window.scrollTo(0, document.body.scrollHeight);
-  }
-}, 50);
-
-function toggleVoiceMenu() {
-  const el = document.getElementById("voiceDropdown");
-  if(el) el.classList.toggle("show");
+function signalDrag() {
+  document.title = "Action:Drag:" + Date.now();
 }
 
-window.onclick = function(event) {
-  if (!event.target.matches('.voice-btn')) {
-    const dropdowns = document.getElementsByClassName("dropdown-content");
-    for (let i = 0; i < dropdowns.length; i++) {
-      if (dropdowns[i].classList.contains('show')) dropdowns[i].classList.remove('show');
-    }
+// Scroll Logic: Only if >= 2 assistant answers
+function checkScroll(smooth=true) {
+  const scrollArea = document.getElementById('scroll-area');
+  const answers = document.querySelectorAll('.message-wrapper.assistant');
+  
+  if (scrollArea && answers.length >= 2) {
+    const opts = smooth ? { top: scrollArea.scrollHeight, behavior: 'smooth' } : { top: scrollArea.scrollHeight };
+    scrollArea.scrollTo(opts);
   }
 }
+
+// Observe new messages
+const chat = document.getElementById('chat');
+if (chat) {
+  new MutationObserver(() => checkScroll(true)).observe(chat, { childList: true, subtree: true });
+}
+
+window.onload = () => checkScroll(false);
 '''
 
 CHAT_HTML_TEMPLATE = f'''<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"><style>{CHAT_CSS}</style></head>
 <body>
-{{pin_hint}}
-<div id="chat" class="chat-container">{{messages}}</div>
+<div class="chat-window">
+  <div class="drag-handle" onmousedown="signalDrag()"></div>
+  {{pin_hint}}
+  <div class="chat-scroll-area" id="scroll-area">
+    <div id="chat" class="chat-container">{{messages}}</div>
+  </div>
+</div>
 <script>{CHAT_JS}</script>
 </body>
 </html>'''
@@ -907,8 +996,21 @@ class ChatOverlay(Gtk.Window):
         settings = self.webview.get_settings()
         settings.set_enable_javascript(True)
         self.webview.connect("decide-policy", self._on_policy_decision)
+        self.webview.connect("notify::title", self._on_title_changed)
         self.add(self.webview)
     
+    def _on_title_changed(self, webview, pspec) -> None:
+        """Handle title changes for drag signals."""
+        title = webview.get_title()
+        if title and title.startswith("Action:Drag"):
+            # Get actual pointer position to prevent jumping
+            display = self.get_display()
+            seat = display.get_default_seat()
+            pointer = seat.get_pointer()
+            screen, x, y = pointer.get_position()
+            
+            self.begin_move_drag(1, x, y, Gtk.get_current_event_time())
+
     def _init_animation(self) -> None:
         """Initialize fade animation state."""
         self.opacity_value = 0.0
@@ -977,11 +1079,13 @@ class ChatOverlay(Gtk.Window):
         for idx, msg in enumerate(messages):
             role = msg["role"]
             rendered = self._render_markdown(msg["text"])
-            msg_id = f"msg_{idx}"
-            copy_btn = f'<button class="copy-btn" onclick="copyText(this, \'{msg_id}\')">{svg_icon}</button>'
+            # Pass index, not ID, for robust handling
+            copy_btn = f'<button class="copy-btn" onclick="copyText(this, {idx})">{svg_icon}</button>'
+            msg_html = f'<div class="message"><div class="text">{rendered}</div></div>'
+            
             html_messages.append(
                 f'<div class="message-wrapper {role}">'
-                f'<div class="message"><div class="text" id="{msg_id}">{rendered}</div></div>'
+                f'{msg_html}'
                 f'{copy_btn}'
                 f'</div>'
             )
@@ -992,23 +1096,47 @@ class ChatOverlay(Gtk.Window):
         # Build pin hint - simple text with gear icon
         pin_label = CFG.HOTKEY_DEFS["pin"][0]
         tts_label = CFG.HOTKEY_DEFS["tts"][0]
-        pin_status = f"{pin_label}: Unpin Chat" if is_pinned else f"{pin_label}: Pin Chat"
+        pin_status = f"{pin_label}: Unpin" if is_pinned else f"{pin_label}: Pin"
         voice_status = f"{tts_label}: Mute" if is_tts else f"{tts_label}: Voice"
-        pin_hint = f'<div class="pin-hint">{pin_status} | {voice_status} | <a href="settings://open" class="settings-link">⚙️</a></div>'
+        
+        pin_hint = (
+            f'<div class="pin-hint">'
+            f'<span>{pin_status}</span>'
+            f'<span style="opacity:0.2; margin:0 4px">|</span>'
+            f'<span>{voice_status}</span>'
+            f'<span style="opacity:0.2; margin:0 4px">|</span>'
+            f'<a href="settings://open" class="settings-link" title="Settings">⚙️</a>'
+            f'</div>'
+        )
         
         html = CHAT_HTML_TEMPLATE.replace("{messages}", "\n".join(html_messages))
         html = html.replace("{pin_hint}", pin_hint)
         self.webview.load_html(html, None)
     
     def _on_policy_decision(self, webview, decision, decision_type) -> bool:
-        """Handle settings:// URI navigation."""
+        """Handle URI navigations (copy://, settings://)."""
         if decision_type == WebKit2.PolicyDecisionType.NAVIGATION_ACTION:
             nav = decision.get_navigation_action()
             uri = nav.get_request().get_uri()
-            if uri and uri.startswith("settings://"):
+            if not uri:
+                return False
+                
+            if uri.startswith("settings://"):
                 GLib.idle_add(SettingsDialog.show)
                 decision.ignore()
                 return True
+                
+            if uri.startswith("copy://"):
+                try:
+                    idx = int(uri.split("copy://")[1])
+                    if 0 <= idx < len(STATE.chat_messages):
+                        text = STATE.chat_messages[idx]["text"]
+                        pyperclip.copy(text)
+                except Exception:
+                    pass
+                decision.ignore()
+                return True
+                
         return False
     
     @staticmethod
@@ -1122,7 +1250,7 @@ class SettingsDialog:
         
         # Info label
         info_label = Gtk.Label()
-        info_label.set_markup("<small><i>Hotkeys are fixed and cannot be changed.</i></small>")
+        info_label.set_markup("<small><i>(Hotkeys are defined in section 2 of the code.)</i></small>")
         info_label.set_halign(Gtk.Align.START)
         vbox.pack_start(info_label, False, False, 10)
         
@@ -1165,6 +1293,7 @@ class TrayManager:
         Gtk.main()
     
     @staticmethod
+    @run_on_main_thread
     def update_menu() -> None:
         """Rebuild and update tray menu."""
         if not STATE.indicator:
