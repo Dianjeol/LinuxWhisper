@@ -112,7 +112,7 @@ class Config:
     TEMP_TTS_PATH: str = "/tmp/linuxwhisper_tts.wav"
     
     # --- Wake Word Settings ---
-    WAKE_WORD_MODEL: str = "hey_luna"
+    WAKE_WORD_MODEL: str = "alexa"
     WAKE_WORD_THRESHOLD: float = 0.5
     SILENCE_THRESHOLD: float = 0.01  # RMS amplitude threshold
     SILENCE_DURATION: float = 1.5    # Seconds of silence to stop recording
@@ -382,21 +382,13 @@ class WakeWordService:
         try:
             # openwakeword v0.4.0: Find model path dynamically
             model_paths = openwakeword.get_pretrained_model_paths()
-            # Search for model path matching CFG.WAKE_WORD_MODEL (e.g. "hey_jarvis")
-            model_path = next((p for p in model_paths if CFG.WAKE_WORD_MODEL in p.lower()), None)
+            alexa_path = next((p for p in model_paths if "alexa" in p.lower()), None)
             
-            # If not in pre-trained, check local 'models' directory
-            if not model_path:
-                local_model = os.path.join(os.getcwd(), "models", f"{CFG.WAKE_WORD_MODEL}.onnx")
-                if os.path.exists(local_model):
-                    model_path = local_model
-                    print(f"Loading Custom Wake Word Model: {model_path}")
-
-            if not model_path:
-                print(f"❌ Wake Word Error: '{CFG.WAKE_WORD_MODEL}' model not found in pre-trained or local models.")
+            if not alexa_path:
+                print("❌ Wake Word Error: 'alexa' model not found in pre-trained models.")
                 return
 
-            oww_model = WakeWordModel(wakeword_model_paths=[model_path])
+            oww_model = WakeWordModel(wakeword_model_paths=[alexa_path])
         except Exception as e:
             print(f"❌ Wake Word Init Error: {e}")
             return
@@ -447,12 +439,12 @@ class WakeWordService:
                         # Check for activation using fuzzy key matching
                         found_score = 0.0
                         for key, score in prediction.items():
-                             if CFG.WAKE_WORD_MODEL in key.lower():
+                             if "alexa" in key.lower():
                                  found_score = score
                                  break
                         
                         if found_score > CFG.WAKE_WORD_THRESHOLD:
-                            print(f"🔔 Wake Word Detected!")
+                            print("🔔 Wake Word Detected!")
                             WakeWordService._trigger_success()
                             # Break inner loop to close stream immediately
                             break
