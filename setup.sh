@@ -35,6 +35,10 @@ echo -e "${BLUE}⬇️  Installing Python requirements...${NC}"
 ./venv/bin/pip install --upgrade pip
 ./venv/bin/pip install -r requirements.txt
 
+# 5. Download AI Models
+echo -e "${BLUE}⬇️  Downloading OpenWakeWord models...${NC}"
+./venv/bin/python -c "import openwakeword; openwakeword.utils.download_models()"
+
 # 5. Success Message
 echo -e "${GREEN}✅ Installation complete!${NC}"
 echo -e "${BLUE}🔒 Setting permissions for multi-user access...${NC}"
