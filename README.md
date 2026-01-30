@@ -11,7 +11,7 @@ Features
 - **AI Chat (F4)**: Context-aware Q&A using Moonshot Kimi.
 - **Smart Rewrite (F7)**: Highlight text, speak to rewrite.
 - **Vision (F8)**: Screenshot analysis using Llama 4.
-- **Wake Word**: Say "Alexa" to trigger AI Chat hands-free.
+- **Wake Word**: Say "Hey Rhasspy" to trigger AI Chat hands-free.
 - **Pin Chat (F9)**: Toggle chat overlay pin mode.
 - **TTS (F10)**: Toggle text-to-speech for AI responses.
 
@@ -56,7 +56,7 @@ Hotkeys:
 | F10 | Toggle TTS / Mute |
 
 **Wake Word:**
-- Say **"Alexa"** to trigger the AI Chat mode automatically.
+- Say **"Hey Rhasspy"** to trigger the AI Chat mode automatically.
 - Recording stops automatically after **1.5s** of silence.
 
 **Settings:**

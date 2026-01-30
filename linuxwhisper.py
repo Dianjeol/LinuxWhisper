@@ -116,7 +116,7 @@ class Config:
     TEMP_TTS_PATH: str = "/tmp/linuxwhisper_tts.wav"
     
     # --- Wake Word Settings ---
-    WAKE_WORD_MODEL: str = "alexa"
+    WAKE_WORD_MODEL: str = "hey_rhasspy"
     WAKE_WORD_THRESHOLD: float = 0.5
     SILENCE_THRESHOLD: float = 0.01  # RMS amplitude threshold
     SILENCE_DURATION: float = 1.5    # Seconds of silence to stop recording
@@ -382,19 +382,19 @@ class WakeWordService:
     @staticmethod
     def _listen_loop() -> None:
         """Main listening loop for wake word."""
-        print("👂 Wake Word Listener Started ('Alexa')")
+        print(f"👂 Wake Word Listener Started ('{CFG.WAKE_WORD_MODEL}')")
         
         # Initialize OpenWakeWord
         try:
             # openwakeword v0.4.0: Find model path dynamically
             model_paths = openwakeword.get_pretrained_model_paths()
-            alexa_path = next((p for p in model_paths if "alexa" in p.lower()), None)
+            model_path = next((p for p in model_paths if CFG.WAKE_WORD_MODEL in p.lower()), None)
             
-            if not alexa_path:
-                print("❌ Wake Word Error: 'alexa' model not found in pre-trained models.")
+            if not model_path:
+                print(f"❌ Wake Word Error: '{CFG.WAKE_WORD_MODEL}' model not found in pre-trained models.")
                 return
 
-            oww_model = WakeWordModel(wakeword_models=[alexa_path])
+            oww_model = WakeWordModel(wakeword_models=[model_path])
         except Exception as e:
             print(f"❌ Wake Word Init Error: {e}")
             return
@@ -452,7 +452,7 @@ class WakeWordService:
                         # Check for activation using fuzzy key matching
                         found_score = 0.0
                         for key, score in prediction.items():
-                             if "alexa" in key.lower():
+                             if CFG.WAKE_WORD_MODEL in key.lower():
                                  found_score = score
                                  break
                         
