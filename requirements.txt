@@ -1,5 +1,5 @@
 sounddevice
-numpy
+numpy<2
 scipy
 groq
 pynput

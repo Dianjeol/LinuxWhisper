@@ -390,7 +390,7 @@ class WakeWordService:
                 print("❌ Wake Word Error: 'alexa' model not found in pre-trained models.")
                 return
 
-            oww_model = WakeWordModel(wakeword_model_paths=[alexa_path])
+            oww_model = WakeWordModel(wakeword_models=[alexa_path])
         except Exception as e:
             print(f"❌ Wake Word Init Error: {e}")
             return
