@@ -44,6 +44,10 @@ import base64
 import io
 import math
 import os
+
+# Suppress libEGL warnings by forcing software rendering for GTK/WebKit
+os.environ["LIBGL_ALWAYS_SOFTWARE"] = "1"
+os.environ["WEBKIT_DISABLE_COMPOSITING_MODE"] = "1"
 import queue
 import re
 import subprocess
