@@ -112,8 +112,8 @@ class Config:
     TTS_MAX_CHARS: int = 4000
     
     # --- Temp File Paths ---
-    TEMP_SCREEN_PATH: str = "/tmp/temp_screen.png"
-    TEMP_TTS_PATH: str = "/tmp/linuxwhisper_tts.wav"
+    TEMP_SCREEN_PATH: str = f"/tmp/temp_screen_{os.getuid()}.png"
+    TEMP_TTS_PATH: str = f"/tmp/linuxwhisper_tts_{os.getuid()}.wav"
     
     # --- Wake Word Settings ---
     WAKE_WORD_MODEL: str = "hey_rhasspy"
