@@ -176,9 +176,7 @@ class AppState:
     answer_history: List[Dict[str, str]] = field(default_factory=list)
     
     # --- TTS ---
-    tts_enabled: bool = True  # Enabled by default
-    tts_voice: str = CFG.TTS_DEFAULT_VOICE
-    tts_enabled: bool = True  # Enabled by default
+    tts_enabled: bool = False  # Disabled by default
     tts_voice: str = CFG.TTS_DEFAULT_VOICE
     
     # --- System Tray ---
