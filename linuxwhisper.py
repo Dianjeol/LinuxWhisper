@@ -70,8 +70,6 @@ import sounddevice as sd
 from groq import Groq
 from pynput import keyboard
 from scipy.io.wavfile import write as wav_write
-import openwakeword
-from openwakeword.model import Model as WakeWordModel
 
 gi.require_version('Gtk', '3.0')
 gi.require_version('AyatanaAppIndicator3', '0.1')
@@ -114,12 +112,6 @@ class Config:
     # --- Temp File Paths ---
     TEMP_SCREEN_PATH: str = f"/tmp/temp_screen_{os.getuid()}.png"
     TEMP_TTS_PATH: str = f"/tmp/linuxwhisper_tts_{os.getuid()}.wav"
-    
-    # --- Wake Word Settings ---
-    WAKE_WORD_MODEL: str = "hey_rhasspy"
-    WAKE_WORD_THRESHOLD: float = 0.5
-    SILENCE_THRESHOLD: float = 0.01  # RMS amplitude threshold
-    SILENCE_DURATION: float = 1.5    # Seconds of silence to stop recording
     
     # --- System Prompt ---
     SYSTEM_PROMPT: str = (
@@ -196,11 +188,6 @@ class AppState:
     # --- UI Persistence ---
     last_chat_position: Optional[Tuple[int, int]] = None
     
-    # --- Wake Word State ---
-    wake_word_thread: Optional[threading.Thread] = None
-    wake_word_running: threading.Event = field(default_factory=threading.Event)
-    voice_triggered: bool = False
-    last_speech_time: float = 0.0
 
 
 # Global state instance
@@ -271,20 +258,6 @@ class AudioService:
         
         data_copy = indata.copy()
         
-        # --- Silence Detection Logic ---
-        # Calculate RMS amplitude
-        rms = np.sqrt(np.mean(data_copy**2))
-        if rms > CFG.SILENCE_THRESHOLD:
-            STATE.last_speech_time = time.time()
-        
-        # Check for silence timeout if voice triggered
-        if STATE.voice_triggered:
-            if time.time() - STATE.last_speech_time > CFG.SILENCE_DURATION:
-                # Only trigger stop if we have recorded something substantial (e.g. > 0.5s)
-                # This prevents stopping immediately if it starts silent
-                duration = len(STATE.audio_buffer) * (frames / CFG.SAMPLE_RATE)
-                if duration > 0.5:
-                     AudioService._trigger_voice_stop()
         
         STATE.audio_buffer.append(data_copy)
         
@@ -348,131 +321,7 @@ class AudioService:
         return transcript.text.strip()
 
 
-    @staticmethod
-    @run_on_main_thread
-    def _trigger_voice_stop() -> None:
-        """Trigger stop recording from background thread."""
-        ModeHandler.stop_recording_safe()
 
-# --- Wake Word Service ---
-class WakeWordService:
-    """Manages wake word detection ("Alexa")."""
-    
-    @staticmethod
-    def start() -> None:
-        """Start wake word listening in background thread."""
-        if STATE.wake_word_thread and STATE.wake_word_thread.is_alive():
-            return
-            
-        STATE.wake_word_running.set()
-        STATE.wake_word_thread = threading.Thread(
-            target=WakeWordService._listen_loop,
-            daemon=True
-        )
-        STATE.wake_word_thread.start()
-    
-    @staticmethod
-    def stop() -> None:
-        """Stop wake word listening."""
-        STATE.wake_word_running.clear()
-        if STATE.wake_word_thread:
-            STATE.wake_word_thread.join(timeout=1.0)
-            STATE.wake_word_thread = None
-    
-    @staticmethod
-    def _listen_loop() -> None:
-        """Main listening loop for wake word."""
-        print(f"👂 Wake Word Listener Started ('{CFG.WAKE_WORD_MODEL}')")
-        
-        # Initialize OpenWakeWord
-        try:
-            # openwakeword v0.4.0: Find model path dynamically
-            model_paths = openwakeword.get_pretrained_model_paths()
-            model_path = next((p for p in model_paths if CFG.WAKE_WORD_MODEL in p.lower()), None)
-            
-            if not model_path:
-                print(f"❌ Wake Word Error: '{CFG.WAKE_WORD_MODEL}' model not found in pre-trained models.")
-                return
-
-            oww_model = WakeWordModel(wakeword_models=[model_path])
-        except Exception as e:
-            print(f"❌ Wake Word Init Error: {e}")
-            return
-
-        # Initialize audio stream
-        # OpenWakeWord expects 1280 samples per chunk (80ms at 16khz)
-        # But we use 44.1k usually. We should probably use a separate stream or downsample.
-        # For simplicity, we can use a separate stream at 16khz for the wake word.
-        
-        try:
-            while STATE.wake_word_running.is_set():
-                # Wait if recording is active (do not open stream yet)
-                if STATE.recording:
-                    time.sleep(0.1)
-                    continue
-
-                print("👂 Listening for Wake Word...")
-                oww_model.reset() # Reset model state
-                
-                # Open stream only when NOT recording
-                with sd.InputStream(
-                    samplerate=16000,
-                    blocksize=1280,
-                    channels=1,
-                    dtype='int16'
-                ) as stream:
-                    # Flush startup buffer (approx 0.5s) to prevent ghost triggers
-                    for _ in range(20):
-                        if STATE.recording: break
-                        stream.read(1280)
-                    
-                    warmup_chunks = 15  # Ignore first ~1.2s of predictions
-                        
-                    while STATE.wake_word_running.is_set():
-                        # Check if we switched to recording mode
-                        if STATE.recording:
-                            print("⏸️  Recording active, pausing wake word...")
-                            break # Break inner loop to close stream
-                            
-                        data, overflow = stream.read(1280)
-                        if overflow:
-                            pass
-                        
-                        # Ensure data is 1D array
-                        data = data.flatten()
-                            
-                        # Feed to model
-                        prediction = oww_model.predict(data)
-                        
-                        # WARMUP: Ignore first 10 chunks (approx 1s) to let audio stabilize
-                        if warmup_chunks > 0:
-                            warmup_chunks -= 1
-                            continue
-                        
-                        # Check for activation using fuzzy key matching
-                        found_score = 0.0
-                        for key, score in prediction.items():
-                             if CFG.WAKE_WORD_MODEL in key.lower():
-                                 found_score = score
-                                 break
-                        
-                        if found_score > CFG.WAKE_WORD_THRESHOLD:
-                            print("🔔 Wake Word Detected!")
-                            WakeWordService._trigger_success()
-                            # Break inner loop to close stream immediately
-                            break
-                            
-        except Exception as e:
-            print(f"❌ Wake Word Loop Error: {e}")
-                        
-        except Exception as e:
-            print(f"❌ Wake Word Loop Error: {e}")
-    
-    @staticmethod
-    @run_on_main_thread
-    def _trigger_success() -> None:
-        """Trigger AI mode on main thread."""
-        ModeHandler.trigger_voice_mode("ai")
 
 
 # --- AI Service ---
@@ -1529,19 +1378,6 @@ class TrayManager:
 class ModeHandler:
     """Unified handler for all recording modes."""
     
-    @staticmethod
-    def trigger_voice_mode(mode: str) -> None:
-        """Trigger recording from wake word."""
-        if STATE.recording:
-            return
-            
-        print(f"🎤 Voice Trigger: {mode}")
-        STATE.voice_triggered = True
-        STATE.last_speech_time = time.time() + 1.0 # Buffer time
-        STATE.current_mode = mode
-        
-        OverlayManager.show(mode)
-        AudioService.start_recording()
 
     @staticmethod
     @run_on_main_thread
@@ -1554,7 +1390,6 @@ class ModeHandler:
         OverlayManager.hide()
         audio_data = AudioService.stop_recording()
         
-        STATE.voice_triggered = False  # Reset flag
         
         if audio_data is not None:
              # Process in background
@@ -1786,8 +1621,6 @@ def main() -> None:
     keyboard_thread = threading.Thread(target=KeyboardHandler.run, daemon=True)
     keyboard_thread.start()
     
-    # Start Wake Word Listener
-    WakeWordService.start()
     
     # Run GTK main loop (blocks)
     TrayManager.start()
