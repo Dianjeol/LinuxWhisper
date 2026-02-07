@@ -976,7 +976,7 @@ function copyText(btn, index) {
 }
 
 function signalDrag() {
-  document.title = "Action:Drag:" + Date.now();
+  window.webkit.messageHandlers.signal.postMessage({action: 'Drag'});
 }
 
 function copyCode(btn) {
@@ -984,8 +984,11 @@ function copyCode(btn) {
   if (!code) return;
   
   const text = code.innerText;
-  // Signal Python to copy content
-  document.title = "Action:CopyContent:" + btoa(unescape(encodeURIComponent(text)));
+  // Use robust postMessage IPC for large content
+  window.webkit.messageHandlers.signal.postMessage({
+    action: 'CopyContent',
+    content: text
+  });
   
   // Feedback
   btn.innerHTML = checkIcon;
@@ -1070,32 +1073,38 @@ class ChatOverlay(Gtk.Window):
         self.webview.set_background_color(Gdk.RGBA(0, 0, 0, 0))
         settings = self.webview.get_settings()
         settings.set_enable_javascript(True)
+        
+        # Robust IPC via UserContentManager
+        content_manager = self.webview.get_user_content_manager()
+        content_manager.register_script_message_handler("signal")
+        content_manager.connect("script-message-received::signal", self._on_script_message)
+        
         self.webview.connect("decide-policy", self._on_policy_decision)
-        self.webview.connect("notify::title", self._on_title_changed)
         self.add(self.webview)
     
-    def _on_title_changed(self, webview, pspec) -> None:
-        """Handle title changes for signals."""
-        title = webview.get_title()
-        if not title:
-            return
+    def _on_script_message(self, manager, message) -> None:
+        """Handle robust signals from JavaScript."""
+        try:
+            val = message.get_js_value()
+            if not val or not val.is_object():
+                return
             
-        if title.startswith("Action:Drag"):
-            # Get actual pointer position to prevent jumping
-            display = self.get_display()
-            seat = display.get_default_seat()
-            pointer = seat.get_pointer()
-            screen, x, y = pointer.get_position()
+            data = val.to_string() # We passed an object, but to_string() gives JSON or representation
+            import json
+            msg = json.loads(data)
             
-            self.begin_move_drag(1, x, y, Gtk.get_current_event_time())
-        elif title.startswith("Action:CopyContent:"):
-            try:
-                encoded_data = title.split("Action:CopyContent:")[1]
-                import base64
-                decoded_text = base64.b64decode(encoded_data).decode('utf-8')
-                pyperclip.copy(decoded_text)
-            except Exception as e:
-                print(f"❌ CopyContent Error: {e}")
+            action = msg.get('action')
+            if action == 'Drag':
+                display = self.get_display()
+                seat = display.get_default_seat()
+                pointer = seat.get_pointer()
+                screen, x, y = pointer.get_position()
+                self.begin_move_drag(1, x, y, Gtk.get_current_event_time())
+            elif action == 'CopyContent':
+                content = msg.get('content', '')
+                pyperclip.copy(content)
+        except Exception as e:
+            print(f"❌ ScriptMessage Error: {e}")
 
     def _init_animation(self) -> None:
         """Initialize fade animation state."""
