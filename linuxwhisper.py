@@ -123,10 +123,10 @@ class Config:
     
     # --- Mode Definitions (icon, overlay text, colors) ---
     MODES: Dict[str, Dict[str, str]] = field(default_factory=lambda: {
-        "dictation":  {"icon": "🎙️", "text": "Listening...",    "bg": "#181825", "fg": "#89b4fa"},
-        "ai":         {"icon": "🤖", "text": "AI Listening...", "bg": "#181825", "fg": "#cba6f7"},
-        "ai_rewrite": {"icon": "✍️", "text": "Rewrite Mode...", "bg": "#181825", "fg": "#a6e3a1"},
-        "vision":     {"icon": "📸", "text": "Vision Mode...",  "bg": "#181825", "fg": "#fab387"},
+        "dictation":  {"icon": "🎙️", "text": "Listening...",    "bg": "#112D4E", "fg": "#DBE2EF"},
+        "ai":         {"icon": "🤖", "text": "AI Listening...", "bg": "#112D4E", "fg": "#3F72AF"},
+        "ai_rewrite": {"icon": "✍️", "text": "Rewrite Mode...", "bg": "#112D4E", "fg": "#DBE2EF"},
+        "vision":     {"icon": "📸", "text": "Vision Mode...",  "bg": "#112D4E", "fg": "#3F72AF"},
     })
 
     # format: "id": (Label_fuer_UI, Primary_Key, List_of_Extra_VKs_or_MediaKeys)
@@ -774,7 +774,7 @@ html, body {
   height: 100%;
   background: transparent !important;
   font-family: 'Inter', 'Ubuntu', system-ui, -apple-system, sans-serif;
-  color: #cdd6f4;
+  color: #F9F7F7; /* Off-white */
   font-size: 14px;
   line-height: 1.6;
   overflow: hidden; /* Hide native window scrollbar */
@@ -787,11 +787,11 @@ html, body {
   display: flex; 
   flex-direction: column;
   height: 100%;
-  background-color: rgba(17, 17, 27, 0.85); /* Catppuccin Crust */
+  background-color: rgba(17, 45, 78, 0.9); /* #112D4E with opacity */
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(249, 231, 231, 0.1);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   overflow: hidden;
   margin: 0; position: relative;
@@ -874,17 +874,17 @@ html, body {
   -webkit-backface-visibility: hidden;
 }
 
-/* User Bubble - Catppuccin Surface Gradient */
+/* User Bubble - Medium Blue Gradient */
 .user .message {
-  background: linear-gradient(135deg, #45475a 0%, #313244 100%);
-  color: #cdd6f4;
+  background: linear-gradient(135deg, #3F72AF 0%, #2b507a 100%);
+  color: #F9F7F7;
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-/* Assistant Bubble - Catppuccin Mauve Gradient */
+/* Assistant Bubble - Light Blue Gradient */
 .assistant .message {
-  background: linear-gradient(135deg, #cba6f7 0%, #b4befe 100%);
-  color: #11111b; /* High contrast Crust text */
+  background: linear-gradient(135deg, #DBE2EF 0%, #bdc7d4 100%);
+  color: #112D4E; /* Dark Blue text for high contrast */
   border: 1px solid rgba(255, 255, 255, 0.1);
   font-weight: 500;
 }
@@ -911,12 +911,12 @@ html, body {
 }
 
 .text code {
-  background: rgba(0,0,0,0.3); padding: 2px 5px; border-radius: 4px;
-  font-family: 'SF Mono', monospace; font-size: 0.9em; color: #f87171;
+  background: rgba(17, 45, 78, 0.2); padding: 2px 5px; border-radius: 4px;
+  font-family: 'SF Mono', monospace; font-size: 0.9em; color: #3F72AF; /* Medium Blue */
 }
 .text pre {
-  background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05);
-  color: #cbd5e1; padding: 12px; border-radius: 10px;
+  background: rgba(17, 45, 78, 0.5); border: 1px solid rgba(255,255,255,0.05);
+  color: #cdd6f4; padding: 12px; border-radius: 10px;
   overflow-x: auto; margin: 8px 0; font-family: 'SF Mono', monospace;
   font-size: 0.85em;
 }
