@@ -123,10 +123,10 @@ class Config:
     
     # --- Mode Definitions (icon, overlay text, colors) ---
     MODES: Dict[str, Dict[str, str]] = field(default_factory=lambda: {
-        "dictation":  {"icon": "🎙️", "text": "Listening...",    "bg": "#1a1a2e", "fg": "#00d4ff"},
-        "ai":         {"icon": "🤖", "text": "AI Listening...", "bg": "#1a1a2e", "fg": "#a855f7"},
-        "ai_rewrite": {"icon": "✍️", "text": "Rewrite Mode...", "bg": "#1a1a2e", "fg": "#22c55e"},
-        "vision":     {"icon": "📸", "text": "Vision Mode...",  "bg": "#1a1a2e", "fg": "#f59e0b"},
+        "dictation":  {"icon": "🎙️", "text": "Listening...",    "bg": "#181825", "fg": "#89b4fa"},
+        "ai":         {"icon": "🤖", "text": "AI Listening...", "bg": "#181825", "fg": "#cba6f7"},
+        "ai_rewrite": {"icon": "✍️", "text": "Rewrite Mode...", "bg": "#181825", "fg": "#a6e3a1"},
+        "vision":     {"icon": "📸", "text": "Vision Mode...",  "bg": "#181825", "fg": "#fab387"},
     })
 
     # format: "id": (Label_fuer_UI, Primary_Key, List_of_Extra_VKs_or_MediaKeys)
@@ -766,16 +766,20 @@ class OverlayManager:
 
 
 # --- Chat Overlay HTML Template ---
+SVG_COPY_ICON = '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>'
+
 CHAT_CSS = '''
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body {
   height: 100%;
   background: transparent !important;
   font-family: 'Inter', 'Ubuntu', system-ui, -apple-system, sans-serif;
-  color: #e2e8f0;
+  color: #cdd6f4;
   font-size: 14px;
   line-height: 1.6;
   overflow: hidden; /* Hide native window scrollbar */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Rounded Glass Window Container */
@@ -783,11 +787,11 @@ html, body {
   display: flex; 
   flex-direction: column;
   height: 100%;
-  background-color: rgba(20, 20, 25, 0.75);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  background-color: rgba(17, 17, 27, 0.85); /* Catppuccin Crust */
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   overflow: hidden;
   margin: 0; position: relative;
@@ -807,6 +811,9 @@ html, body {
   padding-bottom: 10px;
   z-index: 10; /* Above drag handle */
   position: relative;
+  /* Optimization for smoother scrolling and less blurring */
+  transform: translateZ(0);
+  will-change: transform;
 }
 /* Custom Scrollbar for inner area */
 .chat-scroll-area::-webkit-scrollbar { width: 6px; }
@@ -846,13 +853,13 @@ html, body {
   margin-bottom: 14px;
   animation: slideFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   opacity: 0;
-  transform: translateY(15px);
+  transform: translate3d(0, 15px, 0);
 }
 .message-wrapper.user { justify-content: flex-end; }
 .message-wrapper.assistant { justify-content: flex-start; }
 
 @keyframes slideFadeIn {
-  to { opacity: 1; transform: translateY(0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
 .message {
@@ -861,20 +868,25 @@ html, body {
   border-radius: 14px;
   position: relative;
   word-wrap: break-word;
+  /* Force hardware acceleration and stabilization */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
-/* User Bubble - Subtler Slate Gradient */
+/* User Bubble - Catppuccin Surface Gradient */
 .user .message {
-  background: linear-gradient(135deg, #475569 0%, #334155 100%);
-  color: #f1f5f9;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(135deg, #45475a 0%, #313244 100%);
+  color: #cdd6f4;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-/* Assistant Bubble */
+/* Assistant Bubble - Catppuccin Mauve Gradient */
 .assistant .message {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: #e2e8f0;
+  background: linear-gradient(135deg, #cba6f7 0%, #b4befe 100%);
+  color: #11111b; /* High contrast Crust text */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-weight: 500;
 }
 
 /* Copy Button */
@@ -893,6 +905,11 @@ html, body {
 .copy-btn.copied { opacity: 1; color: #4ade80; }
 .user .copy-btn { order: -1; }
 
+.text {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
 .text code {
   background: rgba(0,0,0,0.3); padding: 2px 5px; border-radius: 4px;
   font-family: 'SF Mono', monospace; font-size: 0.9em; color: #f87171;
@@ -904,6 +921,36 @@ html, body {
   font-size: 0.85em;
 }
 .text strong { font-weight: 600; color: #fff; }
+
+/* Code block copy button styles */
+.code-block-wrapper {
+  position: relative;
+  margin: 12px 0;
+}
+.code-block-wrapper pre { margin: 0; }
+.code-copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #94a3b8;
+  padding: 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.2s;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+.code-block-wrapper:hover .code-copy-btn { opacity: 1; }
+.code-copy-btn:hover { background: rgba(51, 65, 85, 0.9); color: #fff; transform: scale(1.05); }
+.code-copy-btn svg { width: 14px; height: 14px; fill: currentColor; }
+.code-copy-btn.copied { color: #4ade80; border-color: #4ade80; }
+
 .status {
   align-self: center; background: rgba(255,255,255,0.05); color: #94a3b8;
   font-size: 11px; padding: 3px 10px; border-radius: 10px;
@@ -927,6 +974,20 @@ function copyText(btn, index) {
 
 function signalDrag() {
   document.title = "Action:Drag:" + Date.now();
+}
+
+function copyCode(btn) {
+  const code = btn.nextElementSibling.querySelector('code');
+  if (!code) return;
+  
+  const text = code.innerText;
+  // Signal Python to copy content
+  document.title = "Action:CopyContent:" + btoa(unescape(encodeURIComponent(text)));
+  
+  // Feedback
+  btn.innerHTML = checkIcon;
+  btn.classList.add('copied');
+  setTimeout(() => { btn.innerHTML = copyIcon; btn.classList.remove('copied'); }, 1500);
 }
 
 // Scroll Logic: Only if >= 2 assistant answers
@@ -1011,9 +1072,12 @@ class ChatOverlay(Gtk.Window):
         self.add(self.webview)
     
     def _on_title_changed(self, webview, pspec) -> None:
-        """Handle title changes for drag signals."""
+        """Handle title changes for signals."""
         title = webview.get_title()
-        if title and title.startswith("Action:Drag"):
+        if not title:
+            return
+            
+        if title.startswith("Action:Drag"):
             # Get actual pointer position to prevent jumping
             display = self.get_display()
             seat = display.get_default_seat()
@@ -1021,6 +1085,14 @@ class ChatOverlay(Gtk.Window):
             screen, x, y = pointer.get_position()
             
             self.begin_move_drag(1, x, y, Gtk.get_current_event_time())
+        elif title.startswith("Action:CopyContent:"):
+            try:
+                encoded_data = title.split("Action:CopyContent:")[1]
+                import base64
+                decoded_text = base64.b64decode(encoded_data).decode('utf-8')
+                pyperclip.copy(decoded_text)
+            except Exception as e:
+                print(f"❌ CopyContent Error: {e}")
 
     def _init_animation(self) -> None:
         """Initialize fade animation state."""
@@ -1085,13 +1157,12 @@ class ChatOverlay(Gtk.Window):
                        is_pinned: bool = False, is_tts: bool = False) -> None:
         """Update chat content with markdown rendering."""
         html_messages = []
-        svg_icon = '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>'
         
         for idx, msg in enumerate(messages):
             role = msg["role"]
             rendered = self._render_markdown(msg["text"])
             # Pass index, not ID, for robust handling
-            copy_btn = f'<button class="copy-btn" onclick="copyText(this, {idx})">{svg_icon}</button>'
+            copy_btn = f'<button class="copy-btn" onclick="copyText(this, {idx})">{SVG_COPY_ICON}</button>'
             msg_html = f'<div class="message"><div class="text">{rendered}</div></div>'
             
             html_messages.append(
@@ -1156,8 +1227,16 @@ class ChatOverlay(Gtk.Window):
         import html as html_lib
         text = html_lib.escape(text)
         
-        # Code blocks
-        text = re.sub(r'```(?:\w+)?\n?(.*?)```', r'<pre><code>\1</code></pre>', text, flags=re.DOTALL)
+        # Code blocks with copy button
+        def repl_code_block(match):
+            code_content = match.group(1).strip()
+            return (
+                f'<div class="code-block-wrapper">'
+                f'<button class="code-copy-btn" onclick="copyCode(this)" title="Copy Code">{SVG_COPY_ICON}</button>'
+                f'<pre><code>{code_content}</code></pre>'
+                f'</div>'
+            )
+        text = re.sub(r'```(?:\w+)?(?:\s*\n)(.*?)\n?```', repl_code_block, text, flags=re.DOTALL)
         # Inline code
         text = re.sub(r'`([^`]+)`', r'<code>\1</code>', text)
         # Bold
