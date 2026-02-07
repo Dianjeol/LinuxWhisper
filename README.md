@@ -43,7 +43,7 @@
 
 ### 1. Requirements
 *   **Linux** (Ubuntu/Debian recommended)
-*   **Groq API Key**: [Get it here](https://console.groq.com)
+*   **Groq API Key**: [Get your free key here](https://console.groq.com)
 
 ### 2. Installation
 ```bash
@@ -66,6 +66,6 @@ export GROQ_API_KEY="your_key"
 ---
 
 <p align="center">
-  Built with ❤️ for the Linux Community
+  ❤️ for Linux
 </p>
 
