@@ -976,7 +976,7 @@ function copyText(btn, index) {
 }
 
 function signalDrag() {
-  window.webkit.messageHandlers.signal.postMessage({action: 'Drag'});
+  window.webkit.messageHandlers.signal.postMessage(JSON.stringify({action: 'Drag'}));
 }
 
 function copyCode(btn) {
@@ -985,10 +985,10 @@ function copyCode(btn) {
   
   const text = code.innerText;
   // Use robust postMessage IPC for large content
-  window.webkit.messageHandlers.signal.postMessage({
+  window.webkit.messageHandlers.signal.postMessage(JSON.stringify({
     action: 'CopyContent',
     content: text
-  });
+  }));
   
   // Feedback
   btn.innerHTML = checkIcon;
@@ -1086,10 +1086,11 @@ class ChatOverlay(Gtk.Window):
         """Handle robust signals from JavaScript."""
         try:
             val = message.get_js_value()
-            if not val or not val.is_object():
+            if not val:
                 return
             
-            data = val.to_string() # We passed an object, but to_string() gives JSON or representation
+            # Message is sent as a JSON string from JS
+            data = val.to_string()
             import json
             msg = json.loads(data)
             
