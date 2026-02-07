@@ -1,5 +1,29 @@
-LinuxWhisper
-============
+<div align="center">
+  
+  <img src="assets/logo.png" alt="LinuxWhisper Logo" width="200" height="auto" />
+
+  <br />
+
+  <h1>LinuxWhisper</h1>
+
+  <p>
+    <strong>Voice-Assistant & AI Companion for Linux Desktop</strong>
+  </p>
+
+  <p>
+    <a href="https://www.python.org/">
+      <img src="https://img.shields.io/badge/Python-3.8%2B-blue?style=flat&logo=python" alt="Python">
+    </a>
+    <a href="LICENSE">
+      <img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="License">
+    </a>
+  </p>
+
+</div>
+
+---
+
+## 🚀 Overview
 
 Voice-to-text and AI assistant for Linux desktops.
 Integrates Groq APIs for transcription, chat, rewriting, and vision.

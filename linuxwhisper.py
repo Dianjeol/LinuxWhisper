@@ -932,7 +932,7 @@ html, body {{
 .code-block-wrapper pre {{ margin: 0; }}
 .code-copy-btn {{
   position: absolute;
-  top: 8px;
+  bottom: 8px;
   right: 8px;
   background: {surface_alpha80};
   border: 1px solid {accent_alpha30};
@@ -995,15 +995,25 @@ function copyCode(btn) {
   setTimeout(() => { btn.innerHTML = copyIcon; btn.classList.remove('copied'); }, 1500);
 }
 
-// Scroll Logic: Only if >= 2 assistant answers
+// Scroll Logic: Improved to handle reloads and dynamic content
 function checkScroll(smooth=true) {
   const scrollArea = document.getElementById('scroll-area');
-  const answers = document.querySelectorAll('.message-wrapper.assistant');
+  if (!scrollArea) return;
   
-  if (scrollArea && answers.length >= 2) {
-    const opts = smooth ? { top: scrollArea.scrollHeight, behavior: 'smooth' } : { top: scrollArea.scrollHeight };
-    scrollArea.scrollTo(opts);
-  }
+  const scrollToBottom = () => {
+    scrollArea.scrollTo({ 
+      top: scrollArea.scrollHeight, 
+      behavior: smooth ? 'smooth' : 'auto' 
+    });
+  };
+
+  // Immediate scroll
+  scrollToBottom();
+  
+  // Backup scrolls to account for rendering delays and images
+  requestAnimationFrame(scrollToBottom);
+  setTimeout(scrollToBottom, 50);
+  setTimeout(scrollToBottom, 250);
 }
 
 // Observe new messages
