@@ -16,7 +16,7 @@
 
 </div>
 
-## ✨ Features
+## Features
 
 - 🎙️ **Dictation**: Instant speech-to-text at your cursor using **Whisper-v3**.
 - 💬 **AI Chat**: Contextual Q&A with deep integration.
@@ -65,7 +65,4 @@ export GROQ_API_KEY="your_key"
 
 ---
 
-<p align="center">
-  ❤️ for Linux
-</p>
 
