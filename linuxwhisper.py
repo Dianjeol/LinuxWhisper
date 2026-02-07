@@ -89,6 +89,14 @@ class Config:
     All constants are centralized here for easy modification.
     To change a setting, edit the default value below.
     """
+    # --- Global Design System (Strict 4-Color Palette) ---
+    COLORS: Dict[str, str] = field(default_factory=lambda: {
+        "bg":      "#222831",  # Dark Charcoal
+        "surface": "#393E46",  # Slate
+        "accent":  "#00ADB5",  # Teal
+        "text":    "#EEEEEE"   # Off-White
+    })
+
     # --- Audio Settings ---
     SAMPLE_RATE: int = 44100
     
@@ -123,10 +131,10 @@ class Config:
     
     # --- Mode Definitions (icon, overlay text, colors) ---
     MODES: Dict[str, Dict[str, str]] = field(default_factory=lambda: {
-        "dictation":  {"icon": "🎙️", "text": "Listening...",    "bg": "#112D4E", "fg": "#DBE2EF"},
-        "ai":         {"icon": "🤖", "text": "AI Listening...", "bg": "#112D4E", "fg": "#3F72AF"},
-        "ai_rewrite": {"icon": "✍️", "text": "Rewrite Mode...", "bg": "#112D4E", "fg": "#DBE2EF"},
-        "vision":     {"icon": "📸", "text": "Vision Mode...",  "bg": "#112D4E", "fg": "#3F72AF"},
+        "dictation":  {"icon": "🎙️", "text": "Listening...",    "bg": "#222831", "fg": "#00ADB5"},
+        "ai":         {"icon": "🤖", "text": "AI Listening...", "bg": "#222831", "fg": "#00ADB5"},
+        "ai_rewrite": {"icon": "✍️", "text": "Rewrite Mode...", "bg": "#222831", "fg": "#00ADB5"},
+        "vision":     {"icon": "📸", "text": "Vision Mode...",  "bg": "#222831", "fg": "#00ADB5"},
     })
 
     # format: "id": (Label_fuer_UI, Primary_Key, List_of_Extra_VKs_or_MediaKeys)
@@ -710,7 +718,7 @@ class GtkOverlay(Gtk.Window):
         else:
             # Idle line
             cr.set_line_width(2)
-            cr.set_source_rgb(0.33, 0.33, 0.33)
+            cr.set_source_rgb(0.22, 0.24, 0.27) # #393e46
             cr.move_to(x1, cy)
             cr.line_to(x2, cy)
             cr.stroke()
@@ -774,7 +782,7 @@ html, body {
   height: 100%;
   background: transparent !important;
   font-family: 'Inter', 'Ubuntu', system-ui, -apple-system, sans-serif;
-  color: #F9F7F7; /* Off-white */
+  color: #EEEEEE; 
   font-size: 14px;
   line-height: 1.6;
   overflow: hidden; /* Hide native window scrollbar */
@@ -782,17 +790,17 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Rounded Glass Window Container */
+/* Rounded Window Container */
 .chat-window {
   display: flex; 
   flex-direction: column;
   height: 100%;
-  background-color: rgba(17, 45, 78, 0.9); /* #112D4E with opacity */
+  background-color: rgba(34, 40, 49, 0.95); /* #222831 */
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-radius: 20px;
-  border: 1px solid rgba(249, 231, 231, 0.1);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(0, 173, 181, 0.2); /* Accent border */
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   overflow: hidden;
   margin: 0; position: relative;
 }
@@ -829,7 +837,7 @@ html, body {
   background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.05);
-  color: #94a3b8;
+  color: #00ADB5; /* Accent */
   padding: 5px 14px;
   font-size: 11px; font-weight: 600;
   border-radius: 20px;
@@ -874,17 +882,17 @@ html, body {
   -webkit-backface-visibility: hidden;
 }
 
-/* User Bubble - Medium Blue Gradient */
+/* User Bubble - Surface Color */
 .user .message {
-  background: linear-gradient(135deg, #3F72AF 0%, #2b507a 100%);
-  color: #F9F7F7;
+  background: #393E46;
+  color: #EEEEEE;
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-/* Assistant Bubble - Light Blue Gradient */
+/* Assistant Bubble - Accent Color */
 .assistant .message {
-  background: linear-gradient(135deg, #DBE2EF 0%, #bdc7d4 100%);
-  color: #112D4E; /* Dark Blue text for high contrast */
+  background: #00ADB5;
+  color: #222831; /* Dark text for contrast */
   border: 1px solid rgba(255, 255, 255, 0.1);
   font-weight: 500;
 }
@@ -896,31 +904,26 @@ html, body {
   opacity: 0.6; /* Always visible */
   transition: opacity 0.2s;
   align-self: center;
-  color: #64748b;
+  color: #00ADB5; /* Accent */
   z-index: 20; /* Ensure Clickable */
 }
 .message-wrapper:hover .copy-btn { opacity: 1; }
-.copy-btn:hover { opacity: 1; color: #e2e8f0; transform: scale(1.05); }
+.copy-btn:hover { opacity: 1; color: #EEEEEE; transform: scale(1.05); }
 .copy-btn svg { width: 15px; height: 15px; fill: currentColor; }
-.copy-btn.copied { opacity: 1; color: #4ade80; }
+.copy-btn.copied { opacity: 1; color: #00ADB5; }
 .user .copy-btn { order: -1; }
 
-.text {
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-}
-
 .text code {
-  background: rgba(17, 45, 78, 0.2); padding: 2px 5px; border-radius: 4px;
-  font-family: 'SF Mono', monospace; font-size: 0.9em; color: #3F72AF; /* Medium Blue */
+  background: rgba(0, 173, 181, 0.1); padding: 2px 5px; border-radius: 4px;
+  font-family: 'SF Mono', monospace; font-size: 0.9em; color: #00ADB5;
 }
 .text pre {
-  background: rgba(17, 45, 78, 0.5); border: 1px solid rgba(255,255,255,0.05);
-  color: #cdd6f4; padding: 12px; border-radius: 10px;
+  background: #222831; border: 1px solid #393E46;
+  color: #EEEEEE; padding: 12px; border-radius: 10px;
   overflow-x: auto; margin: 8px 0; font-family: 'SF Mono', monospace;
   font-size: 0.85em;
 }
-.text strong { font-weight: 600; color: #fff; }
+.text strong { font-weight: 600; color: #00ADB5; }
 
 /* Code block copy button styles */
 .code-block-wrapper {
@@ -932,10 +935,10 @@ html, body {
   position: absolute;
   top: 8px;
   right: 8px;
-  background: rgba(30, 41, 59, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(57, 62, 70, 0.8); /* #393E46 */
+  border: 1px solid rgba(0, 173, 181, 0.3);
   border-radius: 6px;
-  color: #94a3b8;
+  color: #EEEEEE;
   padding: 4px;
   cursor: pointer;
   opacity: 0;
