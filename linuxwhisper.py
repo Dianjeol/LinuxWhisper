@@ -91,15 +91,10 @@ class Config:
     """
     # --- Global Design System (Strict 4-Color Palette) ---
     COLORS: Dict[str, str] = field(default_factory=lambda: {
-        "bg":        "#222831",  # Dark Charcoal
-        "surface":   "#393E46",  # Slate
-        "accent":    "#00ADB5",  # Teal
-        "text":      "#EEEEEE",  # Off-White
-        "success":   "#4ade80",  # Green for success signals
-        "dim_text":  "#94a3b8",  # Muted text
-        "selection": "#334155",  # Selection background
-        "white":     "#FFFFFF",
-        "black":     "#000000"
+        "bg":        "#6096B4",
+        "surface":   "#93BFCF",
+        "accent":    "#BDCDD6",
+        "text":      "#EEE9DA",
     })
 
     # --- Audio Settings ---
@@ -840,10 +835,8 @@ html, body {{
   flex-shrink: 0; /* Keep it fixed height */
   width: fit-content;
   margin: 12px auto 4px auto;
-  background: {black_alpha40};
-  backdrop-filter: blur(8px);
-  border: 1px solid {white_alpha05};
-  color: {accent}; /* Accent */
+  background: {accent};
+  color: {bg}; /* Dark text for contrast */
   padding: 5px 14px;
   font-size: 11px; font-weight: 600;
   border-radius: 20px;
@@ -1046,6 +1039,7 @@ class ChatOverlay(Gtk.Window):
         self._setup_window()
         self._setup_webview()
         self._init_animation()
+        self.connect("draw", self._on_draw_window)
         self.show_all()
     
     def _setup_window(self) -> None:
@@ -1072,6 +1066,14 @@ class ChatOverlay(Gtk.Window):
         y = geometry.y + (geometry.height - h) // 2
         self.move(x, y)
         self.set_default_size(w, h)
+
+    def _on_draw_window(self, widget: Gtk.Window, cr: cairo.Context) -> bool:
+        """Clear window background to fixed transparency for rounded corners."""
+        cr.set_operator(cairo.OPERATOR_SOURCE)
+        cr.set_source_rgba(0, 0, 0, 0)
+        cr.paint()
+        cr.set_operator(cairo.OPERATOR_OVER)
+        return False
     
     def _setup_webview(self) -> None:
         """Setup WebKit2 webview."""
@@ -1226,14 +1228,14 @@ class ChatOverlay(Gtk.Window):
             accent_alpha20=hex_to_rgba(CFG.COLORS["accent"], 0.2),
             accent_alpha30=hex_to_rgba(CFG.COLORS["accent"], 0.3),
             text=CFG.COLORS["text"],
-            success=CFG.COLORS["success"],
-            dim_text=CFG.COLORS["dim_text"],
-            selection_alpha90=hex_to_rgba(CFG.COLORS["selection"], 0.9),
-            white=CFG.COLORS["white"],
-            white_alpha05=hex_to_rgba(CFG.COLORS["white"], 0.05),
-            white_alpha10=hex_to_rgba(CFG.COLORS["white"], 0.1),
-            white_alpha25=hex_to_rgba(CFG.COLORS["white"], 0.25),
-            black_alpha40=hex_to_rgba(CFG.COLORS["black"], 0.4)
+            success=CFG.COLORS["accent"],
+            dim_text=hex_to_rgba(CFG.COLORS["text"], 0.6),
+            selection_alpha90=hex_to_rgba(CFG.COLORS["accent"], 0.3),
+            white=CFG.COLORS["text"],
+            white_alpha05=hex_to_rgba(CFG.COLORS["text"], 0.05),
+            white_alpha10=hex_to_rgba(CFG.COLORS["text"], 0.1),
+            white_alpha25=hex_to_rgba(CFG.COLORS["text"], 0.25),
+            black_alpha40=hex_to_rgba(CFG.COLORS["bg"], 0.4)
         )
 
         html = CHAT_HTML_TEMPLATE.replace("{messages}", "\n".join(html_messages))
