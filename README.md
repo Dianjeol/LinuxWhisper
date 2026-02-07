@@ -4,7 +4,7 @@
 
 # LinuxWhisper
 
-**The Premium Voice-AI Companion for your Linux Desktop**
+**A Voice-Assistant & AI Companion for Linux**
 
 [![Python 3.8+](https://img.shields.io/badge/Python-3.8%2B-blue?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald?style=for-the-badge)](LICENSE)
@@ -12,7 +12,7 @@
 
 ---
 
-**LinuxWhisper** is a high-performance, context-aware voice assistant seamlessly integrated into your workflow. Perform complex AI tasks with simple global hotkeys—no context switching required.
+**LinuxWhisper** is a simple voice assistant designed to help you with daily tasks. It uses global hotkeys to provide AI-powered tools without switching windows.
 
 <br />
 
@@ -22,11 +22,11 @@
 
 ## Features
 
-- 🎙️ **Dictation**: Instant speech-to-text at your cursor using **Whisper-v3**.
-- 💬 **AI Chat**: Contextual Q&A with deep integration.
-- ✍️ **Smart Rewrite**: Transform selected text using voice commands.
-- 👁️ **Vision**: Analyze screenshots instantly with **Llama 4**.
-- 🔊 **Voice Feedback**: High-quality TTS for natural AI interaction.
+- 🎙️ **Dictation**: Voice-to-text at your cursor using **Whisper-v3**.
+- 💬 **AI Chat**: Helpful Q&A and conversation.
+- ✍️ **Smart Rewrite**: Modify selected text using your voice.
+- 👁️ **Vision**: Understand screenshots using **Llama 4**.
+- 🔊 **Voice Feedback**: Optional text-to-speech for AI responses.
 
 ---
 
