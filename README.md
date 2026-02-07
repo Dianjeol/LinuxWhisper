@@ -14,6 +14,10 @@
 
 **LinuxWhisper** is a high-performance, context-aware voice assistant seamlessly integrated into your workflow. Perform complex AI tasks with simple global hotkeys—no context switching required.
 
+<br />
+
+![LinuxWhisper Demo](assets/demo.gif)
+
 </div>
 
 ## Features
