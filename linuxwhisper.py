@@ -91,10 +91,15 @@ class Config:
     """
     # --- Global Design System (Strict 4-Color Palette) ---
     COLORS: Dict[str, str] = field(default_factory=lambda: {
-        "bg":      "#222831",  # Dark Charcoal
-        "surface": "#393E46",  # Slate
-        "accent":  "#00ADB5",  # Teal
-        "text":    "#EEEEEE"   # Off-White
+        "bg":        "#222831",  # Dark Charcoal
+        "surface":   "#393E46",  # Slate
+        "accent":    "#00ADB5",  # Teal
+        "text":      "#EEEEEE",  # Off-White
+        "success":   "#4ade80",  # Green for success signals
+        "dim_text":  "#94a3b8",  # Muted text
+        "selection": "#334155",  # Selection background
+        "white":     "#FFFFFF",
+        "black":     "#000000"
     })
 
     # --- Audio Settings ---
@@ -131,10 +136,10 @@ class Config:
     
     # --- Mode Definitions (icon, overlay text, colors) ---
     MODES: Dict[str, Dict[str, str]] = field(default_factory=lambda: {
-        "dictation":  {"icon": "🎙️", "text": "Listening...",    "bg": "#222831", "fg": "#00ADB5"},
-        "ai":         {"icon": "🤖", "text": "AI Listening...", "bg": "#222831", "fg": "#00ADB5"},
-        "ai_rewrite": {"icon": "✍️", "text": "Rewrite Mode...", "bg": "#222831", "fg": "#00ADB5"},
-        "vision":     {"icon": "📸", "text": "Vision Mode...",  "bg": "#222831", "fg": "#00ADB5"},
+        "dictation":  {"icon": "🎙️", "text": "Listening...",    "bg": "bg", "fg": "accent"},
+        "ai":         {"icon": "🤖", "text": "AI Listening...", "bg": "bg", "fg": "accent"},
+        "ai_rewrite": {"icon": "✍️", "text": "Rewrite Mode...", "bg": "bg", "fg": "accent"},
+        "vision":     {"icon": "📸", "text": "Vision Mode...",  "bg": "bg", "fg": "accent"},
     })
 
     # format: "id": (Label_fuer_UI, Primary_Key, List_of_Extra_VKs_or_MediaKeys)
@@ -647,8 +652,8 @@ class GtkOverlay(Gtk.Window):
     def _on_draw(self, widget: Gtk.DrawingArea, cr: cairo.Context) -> None:
         """Draw overlay content."""
         w, h = widget.get_allocated_width(), widget.get_allocated_height()
-        bg_rgb = self._hex_to_rgb(self.config["bg"])
-        fg_rgb = self._hex_to_rgb(self.config["fg"])
+        bg_rgb = self._hex_to_rgb(CFG.COLORS.get(self.config["bg"], CFG.COLORS["bg"]))
+        fg_rgb = self._hex_to_rgb(CFG.COLORS.get(self.config["fg"], CFG.COLORS["accent"]))
         
         # Background rounded rect
         self._draw_rounded_rect(cr, w, h, 15)
@@ -718,7 +723,8 @@ class GtkOverlay(Gtk.Window):
         else:
             # Idle line
             cr.set_line_width(2)
-            cr.set_source_rgb(0.22, 0.24, 0.27) # #393e46
+            idle_rgb = self._hex_to_rgb(CFG.COLORS["surface"])
+            cr.set_source_rgb(*idle_rgb)
             cr.move_to(x1, cy)
             cr.line_to(x2, cy)
             cr.stroke()
@@ -777,42 +783,42 @@ class OverlayManager:
 SVG_COPY_ICON = '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>'
 
 CHAT_CSS = '''
-* { box-sizing: border-box; margin: 0; padding: 0; }
-html, body {
+* {{ box-sizing: border-box; margin: 0; padding: 0; }}
+html, body {{
   height: 100%;
   background: transparent !important;
   font-family: 'Inter', 'Ubuntu', system-ui, -apple-system, sans-serif;
-  color: #EEEEEE; 
+  color: {text}; 
   font-size: 14px;
   line-height: 1.6;
   overflow: hidden; /* Hide native window scrollbar */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
+}}
 
 /* Rounded Window Container */
-.chat-window {
+.chat-window {{
   display: flex; 
   flex-direction: column;
   height: 100%;
-  background-color: rgba(34, 40, 49, 0.95); /* #222831 */
+  background-color: {bg_rgba};
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-radius: 20px;
-  border: 1px solid rgba(0, 173, 181, 0.2); /* Accent border */
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  border: 1px solid {accent_alpha20}; /* Accent border */
+  box-shadow: 0 8px 32px {black_alpha40};
   overflow: hidden;
   margin: 0; position: relative;
-}
+}}
 
 /* Drag Handle */
-.drag-handle {
+.drag-handle {{
   position: absolute; top: 0; left: 0; width: 100%; height: 60px;
   z-index: 5; cursor: move; -webkit-app-region: drag;
-}
+}}
 
 /* Scroll Area */
-.chat-scroll-area {
+.chat-scroll-area {{
   flex: 1;
   overflow-y: auto;
   scroll-behavior: smooth;
@@ -822,22 +828,22 @@ html, body {
   /* Optimization for smoother scrolling and less blurring */
   transform: translateZ(0);
   will-change: transform;
-}
+}}
 /* Custom Scrollbar for inner area */
-.chat-scroll-area::-webkit-scrollbar { width: 6px; }
-.chat-scroll-area::-webkit-scrollbar-track { background: transparent; }
-.chat-scroll-area::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 3px; }
-.chat-scroll-area::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.25); }
+.chat-scroll-area::-webkit-scrollbar {{ width: 6px; }}
+.chat-scroll-area::-webkit-scrollbar-track {{ background: transparent; }}
+.chat-scroll-area::-webkit-scrollbar-thumb {{ background: {white_alpha10}; border-radius: 3px; }}
+.chat-scroll-area::-webkit-scrollbar-thumb:hover {{ background: {white_alpha25}; }}
 
 /* HUD / Pin Hint - Static Header */
-.pin-hint {
+.pin-hint {{
   flex-shrink: 0; /* Keep it fixed height */
   width: fit-content;
   margin: 12px auto 4px auto;
-  background: rgba(0, 0, 0, 0.4);
+  background: {black_alpha40};
   backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  color: #00ADB5; /* Accent */
+  border: 1px solid {white_alpha05};
+  color: {accent}; /* Accent */
   padding: 5px 14px;
   font-size: 11px; font-weight: 600;
   border-radius: 20px;
@@ -845,32 +851,32 @@ html, body {
   display: flex; gap: 10px; align-items: center; justify-content: center;
   transition: opacity 0.3s;
   cursor: default; position: relative;
-}
-.pin-hint a { color: inherit; text-decoration: none; opacity: 0.8; transition: opacity 0.2s; cursor: pointer; }
-.pin-hint a:hover { opacity: 1; color: #fff; }
+}}
+.pin-hint a {{ color: inherit; text-decoration: none; opacity: 0.8; transition: opacity 0.2s; cursor: pointer; }}
+.pin-hint a:hover {{ opacity: 1; color: {white}; }}
 
 /* Chat Content */
-.chat-container {
+.chat-container {{
   display: flex; flex-direction: column;
   padding: 10px 16px 20px 16px;
-}
+}}
 
 /* Messages */
-.message-wrapper {
+.message-wrapper {{
   display: flex;
   margin-bottom: 14px;
   animation: slideFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   opacity: 0;
   transform: translate3d(0, 15px, 0);
-}
-.message-wrapper.user { justify-content: flex-end; }
-.message-wrapper.assistant { justify-content: flex-start; }
+}}
+.message-wrapper.user {{ justify-content: flex-end; }}
+.message-wrapper.assistant {{ justify-content: flex-start; }}
 
-@keyframes slideFadeIn {
-  to { opacity: 1; transform: translate3d(0, 0, 0); }
-}
+@keyframes slideFadeIn {{
+  to {{ opacity: 1; transform: translate3d(0, 0, 0); }}
+}}
 
-.message {
+.message {{
   max-width: 86%;
   padding: 10px 16px;
   border-radius: 14px;
@@ -880,65 +886,65 @@ html, body {
   transform: translateZ(0);
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
-}
+}}
 
 /* User Bubble - Surface Color */
-.user .message {
-  background: #393E46;
-  color: #EEEEEE;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
+.user .message {{
+  background: {surface};
+  color: {text};
+  border: 1px solid {white_alpha05};
+}}
 
 /* Assistant Bubble - Accent Color */
-.assistant .message {
-  background: #00ADB5;
-  color: #222831; /* Dark text for contrast */
-  border: 1px solid rgba(255, 255, 255, 0.1);
+.assistant .message {{
+  background: {accent};
+  color: {bg}; /* Dark text for contrast */
+  border: 1px solid {white_alpha10};
   font-weight: 500;
-}
+}}
 
 /* Copy Button */
-.copy-btn {
+.copy-btn {{
   background: none; border: none; cursor: pointer;
   padding: 6px; margin: 0 4px;
   opacity: 0.6; /* Always visible */
   transition: opacity 0.2s;
   align-self: center;
-  color: #00ADB5; /* Accent */
+  color: {accent}; /* Accent */
   z-index: 20; /* Ensure Clickable */
-}
-.message-wrapper:hover .copy-btn { opacity: 1; }
-.copy-btn:hover { opacity: 1; color: #EEEEEE; transform: scale(1.05); }
-.copy-btn svg { width: 15px; height: 15px; fill: currentColor; }
-.copy-btn.copied { opacity: 1; color: #00ADB5; }
-.user .copy-btn { order: -1; }
+}}
+.message-wrapper:hover .copy-btn {{ opacity: 1; }}
+.copy-btn:hover {{ opacity: 1; color: {text}; transform: scale(1.05); }}
+.copy-btn svg {{ width: 15px; height: 15px; fill: currentColor; }}
+.copy-btn.copied {{ opacity: 1; color: {accent}; }}
+.user .copy-btn {{ order: -1; }}
 
-.text code {
-  background: rgba(0, 173, 181, 0.1); padding: 2px 5px; border-radius: 4px;
-  font-family: 'SF Mono', monospace; font-size: 0.9em; color: #00ADB5;
-}
-.text pre {
-  background: #222831; border: 1px solid #393E46;
-  color: #EEEEEE; padding: 12px; border-radius: 10px;
+.text code {{
+  background: {accent_alpha10}; padding: 2px 5px; border-radius: 4px;
+  font-family: 'SF Mono', monospace; font-size: 0.9em; color: {accent};
+}}
+.text pre {{
+  background: {bg}; border: 1px solid {surface};
+  color: {text}; padding: 12px; border-radius: 10px;
   overflow-x: auto; margin: 8px 0; font-family: 'SF Mono', monospace;
   font-size: 0.85em;
-}
-.text strong { font-weight: 600; color: #00ADB5; }
+}}
+.text strong {{ font-weight: 600; color: {accent}; }}
 
 /* Code block copy button styles */
-.code-block-wrapper {
+.code-block-wrapper {{
   position: relative;
   margin: 12px 0;
-}
-.code-block-wrapper pre { margin: 0; }
-.code-copy-btn {
+}}
+.code-block-wrapper pre {{ margin: 0; }}
+.code-copy-btn {{
   position: absolute;
   top: 8px;
   right: 8px;
-  background: rgba(57, 62, 70, 0.8); /* #393E46 */
-  border: 1px solid rgba(0, 173, 181, 0.3);
+  background: {surface_alpha80};
+  border: 1px solid {accent_alpha30};
   border-radius: 6px;
-  color: #EEEEEE;
+  color: {text};
   padding: 4px;
   cursor: pointer;
   opacity: 0;
@@ -948,17 +954,17 @@ html, body {
   align-items: center;
   justify-content: center;
   backdrop-filter: blur(4px);
-}
-.code-block-wrapper:hover .code-copy-btn { opacity: 1; }
-.code-copy-btn:hover { background: rgba(51, 65, 85, 0.9); color: #fff; transform: scale(1.05); }
-.code-copy-btn svg { width: 14px; height: 14px; fill: currentColor; }
-.code-copy-btn.copied { color: #4ade80; border-color: #4ade80; }
+}}
+.code-block-wrapper:hover .code-copy-btn {{ opacity: 1; }}
+.code-copy-btn:hover {{ background: {selection_alpha90}; color: {white}; transform: scale(1.05); }}
+.code-copy-btn svg {{ width: 14px; height: 14px; fill: currentColor; }}
+.code-copy-btn.copied {{ color: {success}; border-color: {success}; }}
 
-.status {
-  align-self: center; background: rgba(255,255,255,0.05); color: #94a3b8;
+.status {{
+  align-self: center; background: {white_alpha05}; color: {dim_text};
   font-size: 11px; padding: 3px 10px; border-radius: 10px;
-  margin: 10px 0; border: 1px solid rgba(255,255,255,0.05);
-}
+  margin: 10px 0; border: 1px solid {white_alpha05};
+}}
 '''
 
 CHAT_JS = '''
@@ -1016,15 +1022,15 @@ if (chat) {
 window.onload = () => checkScroll(false);
 '''
 
-CHAT_HTML_TEMPLATE = f'''<!DOCTYPE html>
+CHAT_HTML_TEMPLATE = '''<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"><style>{CHAT_CSS}</style></head>
 <body>
 <div class="chat-window">
   <div class="drag-handle" onmousedown="signalDrag()"></div>
-  {{pin_hint}}
+  {pin_hint}
   <div class="chat-scroll-area" id="scroll-area">
-    <div id="chat" class="chat-container">{{messages}}</div>
+    <div id="chat" class="chat-container">{messages}</div>
   </div>
 </div>
 <script>{CHAT_JS}</script>
@@ -1204,8 +1210,37 @@ class ChatOverlay(Gtk.Window):
             f'</div>'
         )
         
+        # Prepare dynamic CSS with centralized colors
+        def hex_to_rgba(hex_str, alpha):
+            h = hex_str.lstrip('#')
+            rgb = tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+            return f"rgba({rgb[0]}, {rgb[1]}, {rgb[2]}, {alpha})"
+
+        formatted_css = CHAT_CSS.format(
+            bg=CFG.COLORS["bg"],
+            bg_rgba=hex_to_rgba(CFG.COLORS["bg"], 0.95),
+            surface=CFG.COLORS["surface"],
+            surface_alpha80=hex_to_rgba(CFG.COLORS["surface"], 0.8),
+            accent=CFG.COLORS["accent"],
+            accent_alpha10=hex_to_rgba(CFG.COLORS["accent"], 0.1),
+            accent_alpha20=hex_to_rgba(CFG.COLORS["accent"], 0.2),
+            accent_alpha30=hex_to_rgba(CFG.COLORS["accent"], 0.3),
+            text=CFG.COLORS["text"],
+            success=CFG.COLORS["success"],
+            dim_text=CFG.COLORS["dim_text"],
+            selection_alpha90=hex_to_rgba(CFG.COLORS["selection"], 0.9),
+            white=CFG.COLORS["white"],
+            white_alpha05=hex_to_rgba(CFG.COLORS["white"], 0.05),
+            white_alpha10=hex_to_rgba(CFG.COLORS["white"], 0.1),
+            white_alpha25=hex_to_rgba(CFG.COLORS["white"], 0.25),
+            black_alpha40=hex_to_rgba(CFG.COLORS["black"], 0.4)
+        )
+
         html = CHAT_HTML_TEMPLATE.replace("{messages}", "\n".join(html_messages))
         html = html.replace("{pin_hint}", pin_hint)
+        html = html.replace("{CHAT_CSS}", formatted_css)
+        html = html.replace("{CHAT_JS}", CHAT_JS)
+        
         self.webview.load_html(html, None)
     
     def _on_policy_decision(self, webview, decision, decision_type) -> bool:
