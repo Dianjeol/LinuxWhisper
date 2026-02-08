@@ -48,6 +48,7 @@ import os
 # Suppress libEGL warnings by forcing software rendering for GTK/WebKit
 os.environ["LIBGL_ALWAYS_SOFTWARE"] = "1"
 os.environ["WEBKIT_DISABLE_COMPOSITING_MODE"] = "1"
+import json
 import queue
 import re
 import subprocess
@@ -55,8 +56,9 @@ import sys
 import threading
 import time
 import warnings
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from functools import wraps
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -89,13 +91,74 @@ class Config:
     All constants are centralized here for easy modification.
     To change a setting, edit the default value below.
     """
-    # --- Global Design System (Strict 4-Color Palette) ---
-    COLORS: Dict[str, str] = field(default_factory=lambda: {
-        "bg":        "#6096B4",
-        "surface":   "#93BFCF",
-        "accent":    "#BDCDD6",
-        "text":      "#EEE9DA",
+    # --- Global Design System (Curated Color Schemes) ---
+    COLOR_SCHEMES: Dict[str, Dict[str, str]] = field(default_factory=lambda: {
+        "Arctic Twilight": {
+            "bg":        "#003049",
+            "surface":   "#335c67",
+            "accent":    "#669bbc",
+            "text":      "#f1faee",
+            "desc":      "Infinite polar blues echoing the cosmos and the soft light of evening snow."
+        },
+        "Volcanic Dawn": {
+            "bg":        "#003049",
+            "surface":   "#669bbc",
+            "accent":    "#780000",
+            "text":      "#fdf0d5",
+            "desc":      "Intense, blazing crimson radiates energy; a bold and dramatic command of attention."
+        },
+        "Spring Blossom": {
+            "bg":        "#a2d2ff",
+            "surface":   "#cdb4db",
+            "accent":    "#ffafcc",
+            "text":      "#322659",
+            "desc":      "Delicate pastel petals and whimsical sky blues, bringing a soft, elegant charm."
+        },
+        "Deep Sea Myth": {
+            "bg":        "#0B0C10",
+            "surface":   "#1F2833",
+            "accent":    "#66FCF1",
+            "text":      "#C5C6C7",
+            "desc":      "Mysterious abyssal depths where cyan phosphorescence meets resilient silent strength."
+        },
+        "Boreal Silence": {
+            "bg":        "#041C06",
+            "surface":   "#064E3B",
+            "accent":    "#10B981",
+            "text":      "#ECFDF5",
+            "desc":      "Lush, dark greens of ancient forests whispering beneath the mint-bright aurora."
+        },
+        "Oceanic Zen": {
+            "bg":        "#002b36",
+            "surface":   "#073642",
+            "accent":    "#2aa198",
+            "text":      "#eee8d5",
+            "desc":      "Mathematically balanced depths of solarized teal, a classic of modern interface harmony."
+        },
+        "Amber Harvest": {
+            "bg":        "#282828",
+            "surface":   "#3c3836",
+            "accent":    "#d65d0e",
+            "text":      "#fbf1c7",
+            "desc":      "Warm engineered earth tones of copper and cream, evoking a retro-industrial rustic elegance."
+        },
+        "Neon Nightshade": {
+            "bg":        "#282a36",
+            "surface":   "#44475a",
+            "accent":    "#bd93f9",
+            "text":      "#f8f8f2",
+            "desc":      "Vibrant high-contrast purple and deep ink-blue, capturing the electric glow of a bioluminescent forest."
+        },
+        "Mediterranean Shore": {
+            "bg":        "#264653",
+            "surface":   "#2a9d8f",
+            "accent":    "#f4a261",
+            "text":      "#fdf1d3",
+            "desc":      "Sun-drenched golden sands meet the smoky blue of midnight tides and crystalline waters."
+        },
     })
+    DEFAULT_SCHEME: str = "Oceanic Zen"
+    SETTINGS_FILE: Path = Path.home() / ".config" / "linuxwhisper" / "settings.json"
 
     # --- Audio Settings ---
     SAMPLE_RATE: int = 44100
@@ -155,6 +218,39 @@ CFG = Config()
 # ============================================================================
 # SECTION 3: STATE MANAGEMENT
 # ============================================================================
+# --- Settings Service ---
+class SettingsManager:
+    """Handles persistence of user settings."""
+    
+    @staticmethod
+    def load() -> Dict[str, Any]:
+        """Load settings from JSON file."""
+        if not CFG.SETTINGS_FILE.exists():
+            return {}
+        try:
+            with open(CFG.SETTINGS_FILE, "r") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"⚠️ Failed to load settings: {e}")
+            return {}
+
+    @staticmethod
+    def save() -> None:
+        """Save current relevant state to JSON file."""
+        try:
+            CFG.SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+            data = {
+                "color_scheme": STATE.color_scheme,
+                "tts_voice": STATE.tts_voice,
+                "tts_enabled": STATE.tts_enabled,
+                "chat_pinned": STATE.chat_pinned
+            }
+            with open(CFG.SETTINGS_FILE, "w") as f:
+                json.dump(data, f, indent=4)
+        except Exception as e:
+            print(f"⚠️ Failed to save settings: {e}")
+
+
 @dataclass
 class AppState:
     """
@@ -187,12 +283,27 @@ class AppState:
     tts_enabled: bool = False  # Disabled by default
     tts_voice: str = CFG.TTS_DEFAULT_VOICE
     
+    # --- UI Theme ---
+    color_scheme: str = CFG.DEFAULT_SCHEME
+    
     # --- System Tray ---
     indicator: Optional[AppIndicator.Indicator] = None
     gtk_menu: Optional[Gtk.Menu] = None
     
     # --- UI Persistence ---
     last_chat_position: Optional[Tuple[int, int]] = None
+    
+    def __post_init__(self):
+        """Load persistent settings after initialization."""
+        saved = SettingsManager.load()
+        if "color_scheme" in saved:
+            self.color_scheme = saved["color_scheme"]
+        if "tts_voice" in saved:
+            self.tts_voice = saved["tts_voice"]
+        if "tts_enabled" in saved:
+            self.tts_enabled = saved["tts_enabled"]
+        if "chat_pinned" in saved:
+            self.chat_pinned = saved["chat_pinned"]
     
 
 
@@ -201,6 +312,7 @@ STATE = AppState()
 
 
 
+# ============================================================================
 # ============================================================================
 # SECTION 4: API CLIENT INITIALIZATION
 # ============================================================================
@@ -647,8 +759,9 @@ class GtkOverlay(Gtk.Window):
     def _on_draw(self, widget: Gtk.DrawingArea, cr: cairo.Context) -> None:
         """Draw overlay content."""
         w, h = widget.get_allocated_width(), widget.get_allocated_height()
-        bg_rgb = self._hex_to_rgb(CFG.COLORS.get(self.config["bg"], CFG.COLORS["bg"]))
-        fg_rgb = self._hex_to_rgb(CFG.COLORS.get(self.config["fg"], CFG.COLORS["accent"]))
+        scheme = CFG.COLOR_SCHEMES.get(STATE.color_scheme, CFG.COLOR_SCHEMES[CFG.DEFAULT_SCHEME])
+        bg_rgb = self._hex_to_rgb(scheme.get(self.config["bg"], scheme["bg"]))
+        fg_rgb = self._hex_to_rgb(scheme.get(self.config["fg"], scheme["accent"]))
         
         # Background rounded rect
         self._draw_rounded_rect(cr, w, h, 15)
@@ -718,7 +831,8 @@ class GtkOverlay(Gtk.Window):
         else:
             # Idle line
             cr.set_line_width(2)
-            idle_rgb = self._hex_to_rgb(CFG.COLORS["surface"])
+            scheme = CFG.COLOR_SCHEMES.get(STATE.color_scheme, CFG.COLOR_SCHEMES[CFG.DEFAULT_SCHEME])
+            idle_rgb = self._hex_to_rgb(scheme["surface"])
             cr.set_source_rgb(*idle_rgb)
             cr.move_to(x1, cy)
             cr.line_to(x2, cy)
@@ -836,7 +950,7 @@ html, body {{
   width: fit-content;
   margin: 12px auto 4px auto;
   background: {accent};
-  color: {bg}; /* Dark text for contrast */
+  color: {text_on_accent}; /* Contrast text */
   padding: 5px 14px;
   font-size: 11px; font-weight: 600;
   border-radius: 20px;
@@ -891,7 +1005,7 @@ html, body {{
 /* Assistant Bubble - Accent Color */
 .assistant .message {{
   background: {accent};
-  color: {bg}; /* Dark text for contrast */
+  color: {text_on_accent}; /* Contrast text */
   border: 1px solid {white_alpha10};
   font-weight: 500;
 }}
@@ -1227,25 +1341,36 @@ class ChatOverlay(Gtk.Window):
             h = hex_str.lstrip('#')
             rgb = tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
             return f"rgba({rgb[0]}, {rgb[1]}, {rgb[2]}, {alpha})"
+        
+        def get_contrast_text(bg_hex):
+            # Simple luminance-based contrast
+            h = bg_hex.lstrip('#')
+            rgb = [int(h[i:i+2], 16) for i in (0, 2, 4)]
+            # Standard relative luminance formula
+            lum = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255
+            return "#000000" if lum > 0.5 else "#FFFFFF"
+
+        scheme = CFG.COLOR_SCHEMES.get(STATE.color_scheme, CFG.COLOR_SCHEMES[CFG.DEFAULT_SCHEME])
 
         formatted_css = CHAT_CSS.format(
-            bg=CFG.COLORS["bg"],
-            bg_rgba=hex_to_rgba(CFG.COLORS["bg"], 0.95),
-            surface=CFG.COLORS["surface"],
-            surface_alpha80=hex_to_rgba(CFG.COLORS["surface"], 0.8),
-            accent=CFG.COLORS["accent"],
-            accent_alpha10=hex_to_rgba(CFG.COLORS["accent"], 0.1),
-            accent_alpha20=hex_to_rgba(CFG.COLORS["accent"], 0.2),
-            accent_alpha30=hex_to_rgba(CFG.COLORS["accent"], 0.3),
-            text=CFG.COLORS["text"],
-            success=CFG.COLORS["accent"],
-            dim_text=hex_to_rgba(CFG.COLORS["text"], 0.6),
-            selection_alpha90=hex_to_rgba(CFG.COLORS["accent"], 0.3),
-            white=CFG.COLORS["text"],
-            white_alpha05=hex_to_rgba(CFG.COLORS["text"], 0.05),
-            white_alpha10=hex_to_rgba(CFG.COLORS["text"], 0.1),
-            white_alpha25=hex_to_rgba(CFG.COLORS["text"], 0.25),
-            black_alpha40=hex_to_rgba(CFG.COLORS["bg"], 0.4)
+            bg=scheme["bg"],
+            bg_rgba=hex_to_rgba(scheme["bg"], 0.95),
+            surface=scheme["surface"],
+            surface_alpha80=hex_to_rgba(scheme["surface"], 0.8),
+            accent=scheme["accent"],
+            accent_alpha10=hex_to_rgba(scheme["accent"], 0.1),
+            accent_alpha20=hex_to_rgba(scheme["accent"], 0.2),
+            accent_alpha30=hex_to_rgba(scheme["accent"], 0.3),
+            text=scheme["text"],
+            text_on_accent=scheme["text"] if STATE.color_scheme == "Pink Orchid" else get_contrast_text(scheme["accent"]),
+            success=scheme["accent"],
+            dim_text=hex_to_rgba(scheme["text"], 0.6),
+            selection_alpha90=hex_to_rgba(scheme["accent"], 0.3),
+            white=scheme["text"],
+            white_alpha05=hex_to_rgba(scheme["text"], 0.05),
+            white_alpha10=hex_to_rgba(scheme["text"], 0.1),
+            white_alpha25=hex_to_rgba(scheme["text"], 0.25),
+            black_alpha40=hex_to_rgba(scheme["bg"], 0.4)
         )
 
         html = CHAT_HTML_TEMPLATE.replace("{messages}", "\n".join(html_messages))
@@ -1323,6 +1448,7 @@ class SettingsDialog:
     """GTK Settings dialog for voice and hotkey configuration."""
     
     _instance: Optional[Gtk.Window] = None
+    _listbox: Optional[Gtk.ListBox] = None
     
     @classmethod
     def show(cls) -> None:
@@ -1338,7 +1464,7 @@ class SettingsDialog:
     def _create_dialog(cls) -> Gtk.Window:
         """Create the settings dialog window."""
         dialog = Gtk.Window(title="LinuxWhisper Settings")
-        dialog.set_default_size(350, 300)
+        dialog.set_default_size(400, 580)
         dialog.set_resizable(False)
         dialog.set_position(Gtk.WindowPosition.CENTER)
         dialog.set_keep_above(True)
@@ -1362,6 +1488,31 @@ class SettingsDialog:
         voice_combo.set_active(CFG.TTS_VOICES.index(STATE.tts_voice) if STATE.tts_voice in CFG.TTS_VOICES else 0)
         voice_combo.connect("changed", cls._on_voice_changed)
         vbox.pack_start(voice_combo, False, False, 0)
+        
+        # --- Color Scheme Gallery ---
+        scheme_label = Gtk.Label()
+        scheme_label.set_halign(Gtk.Align.START)
+        scheme_label.set_markup("<b>Color Scheme Gallery</b>")
+        vbox.pack_start(scheme_label, False, False, 0)
+        
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scrolled.set_size_request(-1, 280)
+        scrolled.set_shadow_type(Gtk.ShadowType.IN)
+        
+        cls._listbox = Gtk.ListBox()
+        cls._listbox.set_selection_mode(Gtk.SelectionMode.SINGLE)
+        cls._listbox.connect("row-activated", cls._on_scheme_selected)
+        
+        schemes = list(CFG.COLOR_SCHEMES.keys())
+        for name in schemes:
+            row = cls._create_theme_row(name)
+            cls._listbox.add(row)
+            if name == STATE.color_scheme:
+                cls._listbox.select_row(row)
+        
+        scrolled.add(cls._listbox)
+        vbox.pack_start(scrolled, True, True, 0)
         
         # --- Hotkeys Section ---
         hotkey_label = Gtk.Label()
@@ -1417,10 +1568,93 @@ class SettingsDialog:
     @staticmethod
     def _on_voice_changed(combo: Gtk.ComboBoxText) -> None:
         """Handle voice selection change."""
-        active = combo.get_active()
-        if 0 <= active < len(CFG.TTS_VOICES):
-            STATE.tts_voice = CFG.TTS_VOICES[active]
+        voice = combo.get_active_text().lower()
+        STATE.tts_voice = voice
+        print(f"🎙️ Voice changed to: {voice}")
+        SettingsManager.save()
+
+    @staticmethod
+    def _on_scheme_selected(listbox: Gtk.ListBox, row: Gtk.ListBoxRow) -> None:
+        """Handle theme gallery selection."""
+        if not row: return
+        # Find theme name from child labels
+        name = None
+        def find_name(child):
+            nonlocal name
+            if isinstance(child, Gtk.Label) and not child.get_style_context().has_class("dim-label"):
+                name = child.get_text()
+            elif hasattr(child, "get_children"):
+                for c in child.get_children(): find_name(c)
+        
+        find_name(row.get_child())
+        
+        if name in CFG.COLOR_SCHEMES:
+            STATE.color_scheme = name
+            print(f"🎨 Color scheme changed to: {name}")
+            SettingsManager.save()
             ChatManager.refresh_overlay()
+
+    @classmethod
+    def _create_theme_row(cls, name: str) -> Gtk.ListBoxRow:
+        """Create a visual card for a theme in the gallery."""
+        scheme = CFG.COLOR_SCHEMES[name]
+        row = Gtk.ListBoxRow()
+        row.set_margin_top(4)
+        row.set_margin_bottom(4)
+        
+        hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        hbox.set_margin_start(10)
+        hbox.set_margin_end(10)
+        hbox.set_margin_top(8)
+        hbox.set_margin_bottom(8)
+        
+        # --- Preview Swatches ---
+        swatch_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=3)
+        colors = [scheme["bg"], scheme["surface"], scheme["accent"], scheme["text"]]
+        for hex_color in colors:
+            swatch = Gtk.DrawingArea()
+            swatch.set_size_request(16, 16)
+            swatch.connect("draw", cls._on_draw_gallery_swatch, hex_color)
+            swatch_box.pack_start(swatch, False, False, 0)
+        
+        hbox.pack_start(swatch_box, False, False, 0)
+        
+        # --- Name & Description ---
+        text_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        name_label = Gtk.Label(label=name)
+        name_label.set_halign(Gtk.Align.START)
+        name_label.set_markup(f"<b>{name}</b>")
+        
+        desc_label = Gtk.Label(label=scheme.get("desc", ""))
+        desc_label.set_halign(Gtk.Align.START)
+        desc_label.set_line_wrap(True)
+        desc_label.set_max_width_chars(30)
+        desc_label.get_style_context().add_class("dim-label")
+        desc_label.set_markup(f"<small><i>{scheme.get('desc', '')}</i></small>")
+        
+        text_vbox.pack_start(name_label, False, False, 0)
+        text_vbox.pack_start(desc_label, False, False, 0)
+        hbox.pack_start(text_vbox, True, True, 0)
+        
+        row.add(hbox)
+        return row
+
+    @staticmethod
+    def _on_draw_gallery_swatch(widget: Gtk.DrawingArea, cr: cairo.Context, hex_color: str) -> bool:
+        """Draw a small color swatch circle in the gallery row."""
+        # Convert hex to RGB
+        h = hex_color.lstrip('#')
+        rgb = tuple(int(h[i:i+2], 16) / 255.0 for i in (0, 2, 4))
+        
+        # Draw circle
+        w, h = widget.get_allocated_width(), widget.get_allocated_height()
+        cr.arc(w/2, h/2, min(w, h)/2 - 1, 0, 2 * math.pi)
+        cr.set_source_rgb(*rgb)
+        cr.fill_preserve()
+        cr.set_source_rgba(0, 0, 0, 0.15)
+        cr.set_line_width(1)
+        cr.stroke()
+        return True
 
 
 # ============================================================================
