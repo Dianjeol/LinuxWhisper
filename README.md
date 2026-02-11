@@ -73,3 +73,34 @@ python -m linuxwhisper
 ---
 
 
+
+## 📂 Project Structure
+
+```
+src/linuxwhisper/
+├── __init__.py          # Package version
+├── __main__.py          # python -m linuxwhisper
+├── app.py               # main() entry point
+├── config.py            # Config dataclass + CFG singleton
+├── state.py             # AppState + SettingsManager + STATE
+├── api.py               # Groq client initialization
+├── decorators.py        # safe_execute, run_on_main_thread
+├── services/
+│   ├── audio.py         # AudioService (recording + transcription)
+│   ├── ai.py            # AIService (chat + vision)
+│   ├── tts.py           # TTSService (Orpheus voice)
+│   ├── clipboard.py     # ClipboardService (xdotool + pyperclip)
+│   └── image.py         # ImageService (screenshots)
+├── managers/
+│   ├── history.py       # HistoryManager (conversation + tray history)
+│   ├── chat.py          # ChatManager (overlay state + auto-hide)
+│   └── overlay.py       # OverlayManager (recording indicator)
+├── ui/
+│   ├── recording_overlay.py  # GtkOverlay (waveform visualization)
+│   ├── chat_overlay.py       # ChatOverlay (WebKit2 + HTML/CSS/JS)
+│   ├── settings_dialog.py    # SettingsDialog (voice, schemes, hotkeys)
+│   └── tray.py               # TrayManager (AppIndicator)
+└── handlers/
+    ├── mode.py           # ModeHandler (dictation/AI/rewrite/vision)
+    └── keyboard.py       # KeyboardHandler (pynput hotkey listener)
+```
