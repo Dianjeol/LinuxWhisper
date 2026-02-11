@@ -61,7 +61,10 @@ git clone https://github.com/Dianjeol/LinuxWhisper.git && cd LinuxWhisper
 export GROQ_API_KEY="your_key"
 
 # Start the whisperer
-./venv/bin/python linuxwhisper.py
+linuxwhisper
+
+# Or alternatively:
+python -m linuxwhisper
 ```
 
 > [!TIP]

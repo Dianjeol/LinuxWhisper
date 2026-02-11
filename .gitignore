@@ -7,3 +7,6 @@ venv/
 *.swp
 *.log
 /tmp/
+*.egg-info/
+dist/
+build/

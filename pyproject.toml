@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "linuxwhisper"
+version = "1.0.0"
+description = "A Voice-Assistant & AI Companion for Linux"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.8"
+authors = [
+    { name = "Dianjeol" },
+]
+
+dependencies = [
+    "sounddevice",
+    "numpy<2",
+    "scipy",
+    "groq",
+    "pynput",
+    "pyperclip",
+    "pygobject",
+    "pycairo",
+]
+
+[project.scripts]
+linuxwhisper = "linuxwhisper.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -30,10 +30,10 @@ else
     echo -e "${BLUE}🐍 Virtual environment already exists.${NC}"
 fi
 
-# 4. Install Python Dependencies
-echo -e "${BLUE}⬇️  Installing Python requirements...${NC}"
+# 4. Install Package (editable mode)
+echo -e "${BLUE}⬇️  Installing LinuxWhisper package...${NC}"
 ./venv/bin/pip install --upgrade pip
-./venv/bin/pip install -r requirements.txt
+./venv/bin/pip install -e .
 
 
 # 5. Success Message
@@ -44,5 +44,6 @@ chmod -R a+rX venv
 echo ""
 echo "To run LinuxWhisper:"
 echo "  1. Set your API key (see README.md)"
-echo "  2. Run: ./venv/bin/python linuxwhisper.py"
+echo "  2. Run: linuxwhisper"
+echo "     Or:  python -m linuxwhisper"
 echo ""
