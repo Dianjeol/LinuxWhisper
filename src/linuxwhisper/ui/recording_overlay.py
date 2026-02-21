@@ -24,7 +24,7 @@ class GtkOverlay(Gtk.Window):
     def __init__(self, mode: str):
         super().__init__(type=Gtk.WindowType.POPUP)
         self.mode = mode
-        self.config = CFG.MODES.get(mode, CFG.MODES["aria"])
+        self.config = CFG.MODES.get(mode, CFG.MODES["dictation"])
         self._setup_window()
         self._setup_ui()
         self.show_all()

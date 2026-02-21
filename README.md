@@ -22,12 +22,11 @@
 
 ## Features
 
-- ✨ **Aria**: Unified AI Assistant for Dictation, Chat, Rewrite, and Vision.
-- 🎙️ **Dictation**: Voice-to-text with context awareness.
-- 👁️ **Vision**: Intelligent screen analysis using **Llama 4**.
+- 🎙️ **Dictation**: Voice-to-text at your cursor using **Whisper-v3**.
+- 💬 **AI Chat**: Helpful Q&A and conversation.
+- ✍️ **Smart Rewrite**: Modify selected text using your voice.
+- 👁️ **Vision**: Understand screenshots using **Llama 4**.
 - 🔊 **Voice Feedback**: Optional text-to-speech for AI responses.
-- 🎨 **Customizable UI**: Multiple premium color schemes (e.g., Oceanic Zen, Neon Nightshade) and scalable chat overlay.
-- ⚙️ **System Tray**: Manage history, toggle overlay visibility ("Hide Chat Overlay"), and access settings quickly.
 
 ---
 
@@ -35,7 +34,10 @@
 
 | Key | Action | Purpose |
 |:---:|:---|:---|
-| `F3` | **Aria** | Unified Assistant (Speak to Dictate, Ask, Rewrite, or Analyze Screen) |
+| `F3` | **Dictate** | Transcribe voice to text at cursor |
+| `F4` | **Chat** | Open/Focus AI conversation |
+| `F7` | **Rewrite** | Highlight text → Speak to modify |
+| `F8` | **Vision** | Screenshot + Intelligent Analysis |
 | `F9` | **Pin** | Toggle "Always on Top" for chat |
 | `F10` | **TTS** | Toggle AI voice feedback |
 
@@ -98,9 +100,7 @@ src/linuxwhisper/
 │   ├── chat_overlay.py       # ChatOverlay (WebKit2 + HTML/CSS/JS)
 │   ├── settings_dialog.py    # SettingsDialog (voice, schemes, hotkeys)
 │   └── tray.py               # TrayManager (AppIndicator)
-├── handlers/
-│   ├── mode.py           # ModeHandler (dictation/AI/rewrite/vision)
-│   └── keyboard.py       # KeyboardHandler (pynput listener)
-├── debug_keys.py         # Utility to find keyboard keycodes
-└── fix_install.sh        # Utility to fix dependency/audio issues
+└── handlers/
+    ├── mode.py           # ModeHandler (dictation/AI/rewrite/vision)
+    └── keyboard.py       # KeyboardHandler (pynput hotkey listener)
 ```

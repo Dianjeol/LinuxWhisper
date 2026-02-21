@@ -28,33 +28,15 @@ class KeyboardHandler:
         for mode_id, data in CFG.HOTKEY_DEFS.items()
     }
 
-    # Track currently pressed keys for modifier detection
-    current_keys: set = set()
-
     @classmethod
     def check_key(cls, key, target_mode: str) -> bool:
-        """Check if pressed key matches target mode AND required modifiers."""
-        # 1. Check Primary Key
+        """Check if pressed key matches target mode."""
         valid_keys = cls.KEY_MAPPINGS.get(target_mode, [])
-        is_key_match = False
-        
         if key in valid_keys:
-            is_key_match = True
-        elif hasattr(key, 'vk') and key.vk in valid_keys:
-            is_key_match = True
-            
-        if not is_key_match:
-            return False
-
-        # 2. Check Modifiers (if defined)
-        required_modifiers = CFG.HOTKEY_MODIFIERS.get(target_mode, [])
-        if not required_modifiers:
             return True
-
-        # Check if ANY of the required modifiers are currently pressed
-        match = any(mod in cls.current_keys for mod in required_modifiers)
-        
-        return match
+        if hasattr(key, 'vk') and key.vk in valid_keys:
+            return True
+        return False
 
     @classmethod
     def get_mode_for_key(cls, key) -> Optional[str]:
@@ -67,8 +49,6 @@ class KeyboardHandler:
     @classmethod
     def on_press(cls, key) -> None:
         """Handle key press events."""
-        cls.current_keys.add(key)
-
         if STATE.recording:
             return
 
@@ -87,8 +67,8 @@ class KeyboardHandler:
         if mode:
             STATE.current_mode = mode
 
-            # For Aria mode, copy selected text first (Context Awareness)
-            if mode == "aria":
+            # For rewrite mode, copy selected text first
+            if mode == "ai_rewrite":
                 subprocess.run(["xdotool", "key", "ctrl+c"])
                 time.sleep(0.1)
 
@@ -98,30 +78,11 @@ class KeyboardHandler:
     @classmethod
     def on_release(cls, key) -> None:
         """Handle key release events."""
-        if key in cls.current_keys:
-            cls.current_keys.remove(key)
-
         if not STATE.recording:
             return
 
-        # Check if released key matches current mode (either the main key OR the modifier)
-        # If user releases Super OR Space, we stop.
-        
-        # We stop if the main trigger key is released OR if the functionality implies a hold.
-        # For Super+Space as a *toggle* or *hold*? 
-        # Dictation usually implies holding the key.
-        # If we want "Hold Super+Space to talk", we stop when Space is released.
-        
-        should_stop = False
-        
-        # Did we release the primary Trigger Key?
-        valid_keys = cls.KEY_MAPPINGS.get(STATE.current_mode, [])
-        if key in valid_keys:
-             should_stop = True
-        elif hasattr(key, 'vk') and key.vk in valid_keys:
-             should_stop = True
-
-        if should_stop:
+        # Check if released key matches current mode
+        if cls.check_key(key, STATE.current_mode):
             OverlayManager.hide()
             audio_data = AudioService.stop_recording()
 

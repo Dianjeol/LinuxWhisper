@@ -80,12 +80,6 @@ class TrayManager:
         settings_item.connect("activate", lambda w: SettingsDialog.show())
         menu.append(settings_item)
 
-        # Hide Chat Overlay Toggle
-        hide_chat = Gtk.CheckMenuItem(label="Hide Chat Overlay")
-        hide_chat.set_active(STATE.chat_hidden)
-        hide_chat.connect("toggled", TrayManager._on_hide_chat_toggled)
-        menu.append(hide_chat)
-
         menu.append(Gtk.SeparatorMenuItem())
 
         # Quit
@@ -104,21 +98,6 @@ class TrayManager:
             clean = re.sub(r"^\[.*?\]\s*", "", item["text"])
             clipboard_service.paste_text(clean)
         return callback
-
-    @staticmethod
-    def _on_hide_chat_toggled(widget: Gtk.CheckMenuItem) -> None:
-        """Handle chat overlay visibility toggle."""
-        from linuxwhisper.state import SettingsManager
-        from linuxwhisper.managers.chat import ChatManager
-        STATE.chat_hidden = widget.get_active()
-        SettingsManager.save(STATE)
-        
-        if STATE.chat_hidden:
-            if STATE.chat_overlay_window:
-                STATE.chat_overlay_window.hide()
-        elif STATE.chat_messages:
-            # Re-show or create if messages exist
-            ChatManager.refresh_overlay()
 
     @staticmethod
     def _quit(widget) -> None:
