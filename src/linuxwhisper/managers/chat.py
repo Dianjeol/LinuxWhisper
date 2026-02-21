@@ -31,6 +31,9 @@ class ChatManager:
     @staticmethod
     def toggle_pin() -> None:
         """Toggle chat overlay pin mode."""
+        if not STATE.chat_enabled:
+            return
+            
         STATE.chat_pinned = not STATE.chat_pinned
 
         if not STATE.chat_pinned and STATE.chat_overlay_window:
@@ -49,6 +52,10 @@ class ChatManager:
     def _show_overlay(status_text: Optional[str] = None) -> None:
         """Show or update chat overlay."""
         ChatManager._cancel_timer()
+
+        if not STATE.chat_enabled:
+            ChatManager._destroy()
+            return
 
         if not STATE.chat_overlay_window:
             # Late import to avoid circular dependency
