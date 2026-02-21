@@ -22,10 +22,9 @@
 
 ## Features
 
-- 🎙️ **Dictation**: Voice-to-text at your cursor using **Whisper-v3**.
-- 💬 **AI Chat**: Helpful Q&A and conversation.
-- ✍️ **Smart Rewrite**: Modify selected text using your voice.
-- 👁️ **Vision**: Understand screenshots using **Llama 4**.
+- ✨ **Aria**: Unified AI Assistant for Dictation, Chat, Rewrite, and Vision.
+- 🎙️ **Dictation**: Voice-to-text with context awareness.
+- 👁️ **Vision**: Intelligent screen analysis using **Llama 4**.
 - 🔊 **Voice Feedback**: Optional text-to-speech for AI responses.
 
 ---
@@ -34,10 +33,7 @@
 
 | Key | Action | Purpose |
 |:---:|:---|:---|
-| `F3` | **Dictate** | Transcribe voice to text at cursor |
-| `F4` | **Chat** | Open/Focus AI conversation |
-| `F7` | **Rewrite** | Highlight text → Speak to modify |
-| `F8` | **Vision** | Screenshot + Intelligent Analysis |
+| `F3` | **Aria** | Unified Assistant (Speak to Dictate, Ask, Rewrite, or Analyze Screen) |
 | `F9` | **Pin** | Toggle "Always on Top" for chat |
 | `F10` | **TTS** | Toggle AI voice feedback |
 

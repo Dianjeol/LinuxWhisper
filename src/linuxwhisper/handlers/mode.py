@@ -71,88 +71,64 @@ class ModeHandler:
             print(f"⚠️ Ignored Hallucination: '{transcribed_text}'")
             return
 
-        handlers = {
-            "dictation": ModeHandler._handle_dictation,
-            "ai": ModeHandler._handle_ai,
-            "ai_rewrite": ModeHandler._handle_ai_rewrite,
-            "vision": ModeHandler._handle_vision,
-        }
-        handler = handlers.get(mode)
-        if handler and transcribed_text:
-            handler(transcribed_text)
-
+        # Unified Aria Handler
+        if mode == "aria":
+            ModeHandler._handle_aria(transcribed_text)
+        
     @staticmethod
-    def _handle_dictation(text: str) -> None:
-        """Handle dictation mode: transcribe and type."""
-        HistoryManager.add_answer(f"[Dictation] {text}")
-        ChatManager.add_message("user", f"🎤 {text}")
-        ClipboardService.type_text(text)
+    def _handle_aria(text: str) -> None:
+        """
+        Handle Aria mode with Intellectual Router:
+        1. Get Context (Clipboard from Ctrl+C)
+        2. Route (Dictation vs Agent vs Vision)
+        3. Execute & Output
+        """
+        # 1. Get Context
+        try:
+            # We assume keyboard handler triggered Ctrl+C
+            context = pyperclip.paste().strip()
+        except Exception:
+            context = ""
 
-    @staticmethod
-    def _handle_ai(text: str) -> None:
-        """Handle AI chat mode: get response and type."""
-        response = AIService.chat(text)
-        if not response:
+        # 2. Router & Process
+        # This returns (Action_Type, Result_Text)
+        result = AIService.route_and_process(text, context)
+        
+        if not result:
             return
 
-        # Update histories
-        HistoryManager.add_message("user", text)
-        HistoryManager.add_message("assistant", response)
-        HistoryManager.add_answer(response)
+        action_type, response = result
 
-        # Update chat overlay
-        ChatManager.add_message("user", text)
-        ChatManager.add_message("assistant", response)
-
-        ClipboardService.type_text(response)
-        TTSService.speak(response)
-
-    @staticmethod
-    def _handle_ai_rewrite(text: str) -> None:
-        """Handle AI rewrite mode: rewrite selected text based on instruction."""
-        original = pyperclip.paste().strip()
-        prompt = (
-            f"INSTRUCTION:\n{text}\n\n"
-            f"ORIGINAL TEXT:\n{original}\n\n"
-            "Rewrite the original text based on the instruction. "
-            "Output ONLY the finished text, without introduction or formatting."
-        )
-
-        response = AIService.chat(prompt)
-        if not response:
-            return
-
-        # Update histories
-        HistoryManager.add_message("user", f"[Rewrite] {text}\nOriginal: {original[:200]}...")
-        HistoryManager.add_message("assistant", response)
-        HistoryManager.add_answer(response)
-
-        # Update chat overlay
-        ChatManager.add_message("user", f"✍️ {text}")
-        ChatManager.add_message("assistant", response)
-
-        ClipboardService.paste_text(response)
-        TTSService.speak(response)
-
-    @staticmethod
-    def _handle_vision(text: str) -> None:
-        """Handle vision mode: screenshot + AI analysis."""
-        image_b64 = ImageService.take_screenshot()
-        if not image_b64:
-            return
-
-        response = AIService.vision(text, image_b64)
-        if not response:
-            return
-
-        # Update histories
-        HistoryManager.add_message("user", f"[Screenshot] {text}")
-        HistoryManager.add_message("assistant", response)
-        HistoryManager.add_answer(response)
-
-        # Update chat overlay
-        ChatManager.add_message("user", f"📸 {text}")
-        ChatManager.add_message("assistant", response)
-
-        ClipboardService.type_text(response)
-        TTSService.speak(response)
+        # 3. Output Logic
+        
+        if action_type == "DICTATION":
+            # Pure Dictation: Just type it. No history, no TTS (usually).
+            ClipboardService.type_text(response)
+            
+            # Optional: Add to chat overlay just for visibility? 
+            # User request implied they want it to *be* dictation, not a chat.
+            # So we probably do NOT add to history or speak.
+            print(f"✍️ Dictated: {response}")
+            
+        else:
+            # AGENT or VISION
+            # Standard Assistant Behavior
+            
+            # Log to History
+            msg_type = " [Vision]" if action_type == "VISION" else ""
+            HistoryManager.add_message("user", f"{text}{msg_type}")
+            HistoryManager.add_message("assistant", response)
+            HistoryManager.add_answer(response)
+    
+            # Update Chat Overlay
+            icon = "📸" if action_type == "VISION" else "✨"
+            ChatManager.add_message("user", f"{icon} {text}")
+            ChatManager.add_message("assistant", response)
+    
+            # Type text (replaces selection if it existed, or types at cursor)
+            # For Agent, we might NOT always want to type? 
+            # Current behavior is: Always type response.
+            ClipboardService.type_text(response)
+            
+            # Speak response
+            TTSService.speak(response)

@@ -24,10 +24,7 @@ def main() -> None:
     print("🚀 LinuxWhisper is running.")
 
     descriptions = {
-        "dictation": "Live dictation at cursor position (Whisper V3)",
-        "ai": "Empathic AI question (Groq Moonshot)",
-        "ai_rewrite": "Smart Rewrite - Highlight text & speak to edit",
-        "vision": "Empathic Vision / Screenshot (Groq Llama 4)",
+        "aria": "Aria - Unified AI Assistant (Dictation, Rewrite, Chat, Vision)",
         "pin": "Toggle Chat Overlay Pin Mode",
         "tts": "Toggle TTS (Read AI responses aloud)"
     }
