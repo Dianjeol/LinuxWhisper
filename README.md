@@ -26,6 +26,8 @@
 - 🎙️ **Dictation**: Voice-to-text with context awareness.
 - 👁️ **Vision**: Intelligent screen analysis using **Llama 4**.
 - 🔊 **Voice Feedback**: Optional text-to-speech for AI responses.
+- 🎨 **Customizable UI**: Multiple premium color schemes (e.g., Oceanic Zen, Neon Nightshade) and scalable chat overlay.
+- ⚙️ **System Tray**: Manage history, toggle overlay visibility ("Hide Chat Overlay"), and access settings quickly.
 
 ---
 
@@ -96,7 +98,9 @@ src/linuxwhisper/
 │   ├── chat_overlay.py       # ChatOverlay (WebKit2 + HTML/CSS/JS)
 │   ├── settings_dialog.py    # SettingsDialog (voice, schemes, hotkeys)
 │   └── tray.py               # TrayManager (AppIndicator)
-└── handlers/
-    ├── mode.py           # ModeHandler (dictation/AI/rewrite/vision)
-    └── keyboard.py       # KeyboardHandler (pynput hotkey listener)
+├── handlers/
+│   ├── mode.py           # ModeHandler (dictation/AI/rewrite/vision)
+│   └── keyboard.py       # KeyboardHandler (pynput listener)
+├── debug_keys.py         # Utility to find keyboard keycodes
+└── fix_install.sh        # Utility to fix dependency/audio issues
 ```
