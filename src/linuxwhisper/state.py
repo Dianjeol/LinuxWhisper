@@ -48,6 +48,7 @@ class SettingsManager:
                 "tts_voice": state.tts_voice,
                 "tts_enabled": state.tts_enabled,
                 "chat_pinned": state.chat_pinned,
+                "chat_hidden": state.chat_hidden,
             }
             with open(CFG.SETTINGS_FILE, "w") as f:
                 json.dump(data, f, indent=4)
@@ -80,6 +81,7 @@ class AppState:
     # --- Chat State ---
     chat_messages: List[Dict[str, str]] = field(default_factory=list)
     chat_pinned: bool = False
+    chat_hidden: bool = False
     chat_hide_timer: Optional[int] = None
 
     # --- History ---
@@ -111,6 +113,8 @@ class AppState:
             self.tts_enabled = saved["tts_enabled"]
         if "chat_pinned" in saved:
             self.chat_pinned = saved["chat_pinned"]
+        if "chat_hidden" in saved:
+            self.chat_hidden = saved["chat_hidden"]
 
 
 # Global state instance

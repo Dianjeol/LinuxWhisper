@@ -50,6 +50,9 @@ class ChatManager:
         """Show or update chat overlay."""
         ChatManager._cancel_timer()
 
+        if STATE.chat_hidden:
+            return
+
         if not STATE.chat_overlay_window:
             # Late import to avoid circular dependency
             from linuxwhisper.ui.chat_overlay import ChatOverlay
