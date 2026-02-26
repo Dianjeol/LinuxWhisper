@@ -36,7 +36,45 @@ echo -e "${BLUE}⬇️  Installing LinuxWhisper package...${NC}"
 ./venv/bin/pip install -e .
 
 
-# 5. Success Message
+# 5. Optional Autostart
+echo ""
+echo -e "${BLUE}🚀 Autostart Setup${NC}"
+read -p "Möchtest du LinuxWhisper zum Autostart hinzufügen? (j/N): " add_autostart
+if [[ "$add_autostart" =~ ^[jJ] ]]; then
+    # Parse GROQ_API_KEY from .bashrc if it exists
+    API_KEY=""
+    if [ -f "$HOME/.bashrc" ]; then
+        API_KEY=$(grep -s "^export GROQ_API_KEY=" "$HOME/.bashrc" | tail -n 1 | cut -d'=' -f2- | tr -d "\"'")
+    fi
+
+    AUTOSTART_DIR="$HOME/.config/autostart"
+    mkdir -p "$AUTOSTART_DIR"
+    DESKTOP_FILE="$AUTOSTART_DIR/linuxwhisper.desktop"
+    
+    # Write desktop file
+    echo "[Desktop Entry]" > "$DESKTOP_FILE"
+    echo "Type=Application" >> "$DESKTOP_FILE"
+    echo "Name=LinuxWhisper" >> "$DESKTOP_FILE"
+    echo "Comment=Whisper Dictation" >> "$DESKTOP_FILE"
+    echo "Icon=$PWD/assets/logo.png" >> "$DESKTOP_FILE"
+    
+    EXEC_CMD="$PWD/venv/bin/linuxwhisper"
+    
+    if [ -n "$API_KEY" ]; then
+        echo "Exec=env GROQ_API_KEY=\"$API_KEY\" $EXEC_CMD" >> "$DESKTOP_FILE"
+        echo -e "${GREEN}✅ GROQ_API_KEY aus .bashrc geladen und zum Autostart hinzugefügt!${NC}"
+    else
+        echo "Exec=$EXEC_CMD" >> "$DESKTOP_FILE"
+        echo -e "${BLUE}ℹ️ Kein GROQ_API_KEY in .bashrc gefunden. Autostart ohne Key erstellt.${NC}"
+    fi
+    
+    echo "Terminal=false" >> "$DESKTOP_FILE"
+    echo "Categories=AudioVideo;Utility;" >> "$DESKTOP_FILE"
+    
+    echo -e "${GREEN}✅ Autostart-Eintrag erstellt in $DESKTOP_FILE${NC}"
+fi
+
+# 6. Success Message
 echo -e "${GREEN}✅ Installation complete!${NC}"
 echo -e "${BLUE}🔒 Setting permissions for multi-user access...${NC}"
 chmod -R a+rX venv
