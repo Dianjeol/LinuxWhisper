@@ -49,6 +49,7 @@ class SettingsManager:
                 "tts_enabled": state.tts_enabled,
                 "chat_pinned": state.chat_pinned,
                 "chat_enabled": state.chat_enabled,
+                "toggle_mode": state.toggle_mode,
             }
             with open(CFG.SETTINGS_FILE, "w") as f:
                 json.dump(data, f, indent=4)
@@ -92,6 +93,9 @@ class AppState:
     tts_enabled: bool = False  # Disabled by default
     tts_voice: str = CFG.TTS_DEFAULT_VOICE
 
+    # --- Hotkey Mode ---
+    toggle_mode: bool = False  # False = hold-to-record, True = press-to-toggle
+
     # --- UI Theme ---
     color_scheme: str = CFG.DEFAULT_SCHEME
 
@@ -115,6 +119,8 @@ class AppState:
             self.chat_pinned = saved["chat_pinned"]
         if "chat_enabled" in saved:
             self.chat_enabled = saved["chat_enabled"]
+        if "toggle_mode" in saved:
+            self.toggle_mode = saved["toggle_mode"]
 
 
 # Global state instance

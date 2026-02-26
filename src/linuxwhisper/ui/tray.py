@@ -83,6 +83,12 @@ class TrayManager:
         chat_toggle.connect("toggled", TrayManager._toggle_chat)
         menu.append(chat_toggle)
 
+        # Toggle mode (hold vs press-to-toggle)
+        toggle_mode = Gtk.CheckMenuItem(label="Toggle Mode (Press to Record)")
+        toggle_mode.set_active(STATE.toggle_mode)
+        toggle_mode.connect("toggled", TrayManager._toggle_mode)
+        menu.append(toggle_mode)
+
         # Settings
         settings_item = Gtk.MenuItem(label="Settings")
         settings_item.connect("activate", lambda w: SettingsDialog.show())
@@ -119,6 +125,13 @@ class TrayManager:
             ChatManager._destroy()
         else:
             ChatManager.refresh_overlay()
+
+    @staticmethod
+    def _toggle_mode(widget) -> None:
+        """Toggle between hold-to-record and press-to-toggle mode."""
+        STATE.toggle_mode = widget.get_active()
+        from linuxwhisper.state import SettingsManager
+        SettingsManager.save(STATE)
 
     @staticmethod
     def _quit(widget) -> None:

@@ -133,8 +133,8 @@ class Config:
 
     # format: "id": (Label_fuer_UI, Primary_Key, List_of_Extra_VKs_or_MediaKeys)
     HOTKEY_DEFS: Dict[str, Tuple[str, Any, List[Any]]] = field(default_factory=lambda: {
-        "dictation":  ("F3",  keyboard.Key.f3, [269025098]),
-        "ai":         ("F4",  keyboard.Key.f4, [269025099]),
+        "dictation":  ("F3",  keyboard.Key.f3, [269025098, 65027]),
+        "ai":         ("F4",  keyboard.Key.f4, [269025099, keyboard.Key.cmd_r]),
         "ai_rewrite": ("F7",  keyboard.Key.f7, [keyboard.Key.media_previous]),
         "vision":     ("F8",  keyboard.Key.f8, [keyboard.Key.media_play_pause]),
         "pin":        ("F9",  keyboard.Key.f9, [269025047, keyboard.Key.media_next]),

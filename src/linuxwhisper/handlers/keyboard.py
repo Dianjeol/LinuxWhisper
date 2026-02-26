@@ -49,17 +49,25 @@ class KeyboardHandler:
     @classmethod
     def on_press(cls, key) -> None:
         """Handle key press events."""
-        if STATE.recording:
-            return
-
         # Pin toggle (non-recording action)
         if cls.check_key(key, "pin"):
-            ChatManager.toggle_pin()
+            if not STATE.recording:
+                ChatManager.toggle_pin()
             return
 
         # TTS toggle (non-recording action)
         if cls.check_key(key, "tts"):
-            TTSService.toggle()
+            if not STATE.recording:
+                TTSService.toggle()
+            return
+
+        # Toggle mode: pressing same key again stops recording
+        if STATE.recording and STATE.toggle_mode:
+            if cls.check_key(key, STATE.current_mode):
+                cls._stop_and_process()
+            return
+
+        if STATE.recording:
             return
 
         # Check for recording mode keys
@@ -81,15 +89,24 @@ class KeyboardHandler:
         if not STATE.recording:
             return
 
-        # Check if released key matches current mode
-        if cls.check_key(key, STATE.current_mode):
-            OverlayManager.hide()
-            audio_data = AudioService.stop_recording()
+        # In toggle mode, release does nothing (stop is handled in on_press)
+        if STATE.toggle_mode:
+            return
 
-            if audio_data is not None:
-                transcribed = AudioService.transcribe(audio_data)
-                if transcribed:
-                    ModeHandler.process(STATE.current_mode, transcribed)
+        # Hold mode: release key stops recording
+        if cls.check_key(key, STATE.current_mode):
+            cls._stop_and_process()
+
+    @classmethod
+    def _stop_and_process(cls) -> None:
+        """Stop recording, transcribe, and process result."""
+        OverlayManager.hide()
+        audio_data = AudioService.stop_recording()
+
+        if audio_data is not None:
+            transcribed = AudioService.transcribe(audio_data)
+            if transcribed:
+                ModeHandler.process(STATE.current_mode, transcribed)
 
     @classmethod
     def run(cls) -> None:
