@@ -3,8 +3,7 @@ Global keyboard listener with data-driven key mappings.
 """
 from __future__ import annotations
 
-import subprocess
-import time
+
 from typing import Any, Dict, List, Optional
 
 from pynput import keyboard
@@ -14,6 +13,7 @@ from linuxwhisper.handlers.mode import ModeHandler
 from linuxwhisper.managers.chat import ChatManager
 from linuxwhisper.managers.overlay import OverlayManager
 from linuxwhisper.services.audio import AudioService
+from linuxwhisper.services.clipboard import ClipboardService
 from linuxwhisper.services.tts import TTSService
 from linuxwhisper.state import STATE
 
@@ -77,8 +77,7 @@ class KeyboardHandler:
 
             # For rewrite mode, copy selected text first
             if mode == "ai_rewrite":
-                subprocess.run(["xdotool", "key", "ctrl+c"])
-                time.sleep(0.1)
+                ClipboardService.copy_selected()
 
             OverlayManager.show(mode)
             AudioService.start_recording()
