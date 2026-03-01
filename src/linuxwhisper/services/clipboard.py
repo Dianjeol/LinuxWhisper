@@ -11,43 +11,34 @@ import time
 
 import pyperclip
 
-# WM_CLASS names of common terminal emulators (lowercase for matching)
-_TERMINAL_CLASSES = frozenset({
-    "gnome-terminal",
-    "mate-terminal",
-    "xfce4-terminal",
-    "tilix",
-    "terminator",
-    "alacritty",
-    "kitty",
-    "konsole",
-    "xterm",
-    "urxvt",
-    "st",
-    "sakura",
-    "terminology",
-    "guake",
-    "tilda",
-    "yakuake",
-    "wezterm",
-    "foot",
-    "cool-retro-term",
-    "hyper",
-    "tabby",
-    "rio",
-    "ghostty",
-})
+# Substrings to match against WM_CLASS (lowercase).
+# Covers namespaced names like "com.mitchellh.ghostty".
+_TERMINAL_KEYWORDS = (
+    "terminal", "terminator", "tilix", "alacritty", "kitty",
+    "konsole", "xterm", "urxvt", "sakura", "terminology",
+    "guake", "tilda", "yakuake", "wezterm", "foot",
+    "cool-retro-term", "hyper", "tabby", "rio", "ghostty",
+)
 
 
 def _is_terminal_focused() -> bool:
     """Check if the currently focused window is a terminal emulator."""
     try:
+        # Get active window ID
+        win_id = subprocess.run(
+            ["xdotool", "getactivewindow"],
+            capture_output=True, text=True, timeout=1,
+        ).stdout.strip()
+        if not win_id:
+            return False
+
+        # Get WM_CLASS via xprop (works on all X11 systems)
         result = subprocess.run(
-            ["xdotool", "getactivewindow", "getwindowclassname"],
+            ["xprop", "-id", win_id, "WM_CLASS"],
             capture_output=True, text=True, timeout=1,
         )
         wm_class = result.stdout.strip().lower()
-        return wm_class in _TERMINAL_CLASSES
+        return any(kw in wm_class for kw in _TERMINAL_KEYWORDS)
     except Exception:
         return False
 
