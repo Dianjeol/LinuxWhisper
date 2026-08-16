@@ -101,8 +101,8 @@ class Config:
     CHAT_AUTO_HIDE_SEC: int = 3
 
     # --- AI Models ---
-    MODEL_CHAT: str = "moonshotai/kimi-k2-instruct"
-    MODEL_VISION: str = "meta-llama/llama-4-scout-17b-16e-instruct"
+    MODEL_CHAT: str = "openai/gpt-oss-120b"
+    MODEL_VISION: str = "qwen/qwen3.6-27b"
     MODEL_WHISPER: str = "whisper-large-v3"
     MODEL_TTS: str = "canopylabs/orpheus-v1-english"
 

@@ -14,14 +14,13 @@ import cairo
 import numpy as np
 
 from linuxwhisper.config import CFG
-from linuxwhisper.platform import SESSION_TYPE
+from linuxwhisper.platform import layer_shell_supported
 from linuxwhisper.state import STATE
 
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gdk, GLib, Gtk
 
-# Optional gtk-layer-shell for Wayland
 try:
     gi.require_version('GtkLayerShell', '0.1')
     from gi.repository import GtkLayerShell
@@ -29,13 +28,16 @@ try:
 except (ValueError, ImportError):
     HAS_LAYER_SHELL = False
 
+# Use layer-shell only if the compositor actually supports the protocol
+USE_LAYER_SHELL = HAS_LAYER_SHELL and layer_shell_supported()
+
 
 class GtkOverlay(Gtk.Window):
     """Floating recording overlay with waveform visualization."""
 
     def __init__(self, mode: str):
         # Layer-shell requires TOPLEVEL; X11 uses POPUP
-        if HAS_LAYER_SHELL and SESSION_TYPE == "wayland":
+        if USE_LAYER_SHELL:
             super().__init__(type=Gtk.WindowType.TOPLEVEL)
         else:
             super().__init__(type=Gtk.WindowType.POPUP)
@@ -59,7 +61,7 @@ class GtkOverlay(Gtk.Window):
 
         w, h = 220, 60
 
-        if HAS_LAYER_SHELL and SESSION_TYPE == "wayland":
+        if USE_LAYER_SHELL:
             # --- Wayland: gtk-layer-shell ---
             GtkLayerShell.init_for_window(self)
             GtkLayerShell.set_layer(self, GtkLayerShell.Layer.TOP)

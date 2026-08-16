@@ -49,6 +49,31 @@ SESSION_TYPE: str = detect_session_type()
 
 logger.info("Detected session type: %s", SESSION_TYPE)
 
+
+# ---------------------------------------------------------------------------
+# Wayland layer-shell support
+# ---------------------------------------------------------------------------
+
+def layer_shell_supported() -> bool:
+    """
+    Check whether the running compositor actually supports the
+    wlr-layer-shell protocol (i.e. not GNOME/Mutter on Wayland).
+
+    Must only return True when both the library is importable and the
+    compositor exposes zwlr_layer_shell_v1. Falls back to XDG shell
+    otherwise to avoid aborting in gtk-layer-shell.
+    """
+    if SESSION_TYPE != "wayland":
+        return False
+    try:
+        import gi
+        gi.require_version("GtkLayerShell", "0.1")
+        from gi.repository import GtkLayerShell
+        return bool(GtkLayerShell.is_supported())
+    except (ValueError, ImportError):
+        return False
+
+
 # ---------------------------------------------------------------------------
 # Singleton backend instances (lazy-initialized)
 # ---------------------------------------------------------------------------

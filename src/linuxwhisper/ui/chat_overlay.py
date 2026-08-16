@@ -14,7 +14,7 @@ from typing import Callable, Dict, List, Optional
 import cairo
 
 from linuxwhisper.config import CFG
-from linuxwhisper.platform import SESSION_TYPE, get_clipboard
+from linuxwhisper.platform import get_clipboard, layer_shell_supported
 from linuxwhisper.state import STATE
 
 import gi
@@ -22,16 +22,16 @@ gi.require_version('Gtk', '3.0')
 gi.require_version('WebKit2', '4.1')
 from gi.repository import Gdk, GLib, Gtk, WebKit2
 
-# Optional gtk-layer-shell for Wayland
+import gi as _gi
 try:
-    gi.require_version('GtkLayerShell', '0.1')
+    _gi.require_version('GtkLayerShell', '0.1')
     from gi.repository import GtkLayerShell
     HAS_LAYER_SHELL = True
 except (ValueError, ImportError):
     HAS_LAYER_SHELL = False
 
-# Use layer-shell only on Wayland when available
-USE_LAYER_SHELL = HAS_LAYER_SHELL and SESSION_TYPE == "wayland"
+# Use layer-shell only on Wayland when supported by the compositor
+USE_LAYER_SHELL = HAS_LAYER_SHELL and layer_shell_supported()
 
 
 # ---------------------------------------------------------------------------
