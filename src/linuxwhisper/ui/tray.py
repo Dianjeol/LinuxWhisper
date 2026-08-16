@@ -9,15 +9,20 @@ from typing import Callable, Dict
 
 from linuxwhisper.config import CFG
 from linuxwhisper.decorators import run_on_main_thread
-from linuxwhisper.state import STATE, HAS_APP_INDICATOR
+from linuxwhisper.state import STATE
 
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 
-if HAS_APP_INDICATOR:
+# AyatanaAppIndicator3 is optional — may not be available on all systems.
+try:
     gi.require_version('AyatanaAppIndicator3', '0.1')
     from gi.repository import AyatanaAppIndicator3 as AppIndicator
+    HAS_APP_INDICATOR = True
+except (ValueError, ImportError):
+    AppIndicator = None
+    HAS_APP_INDICATOR = False
 
 
 class TrayManager:
@@ -28,7 +33,8 @@ class TrayManager:
         """Initialize and start system tray."""
         if not HAS_APP_INDICATOR:
             print("⚠️ AyatanaAppIndicator3 not available — running without tray icon.")
-            print("   Install: libayatana-appindicator (Arch) or gir1.2-ayatanaappindicator3-0.1 (Debian)")
+            print("   Install: libayatana-appindicator (Arch), gir1.2-ayatanaappindicator3-0.1 (Debian)")
+            print("            or libayatana-appindicator-gtk3 (Fedora)")
             Gtk.main()
             return
 
@@ -82,9 +88,9 @@ class TrayManager:
         clear = Gtk.MenuItem(label="Clear History")
         clear.connect("activate", lambda w: HistoryManager.clear_all())
         menu.append(clear)
-        
+
         menu.append(Gtk.SeparatorMenuItem())
-        
+
         # Chat toggle
         chat_toggle = Gtk.CheckMenuItem(label="Show Chat Overlay")
         chat_toggle.set_active(STATE.chat_enabled)
@@ -127,7 +133,7 @@ class TrayManager:
         STATE.chat_enabled = widget.get_active()
         from linuxwhisper.state import SettingsManager
         SettingsManager.save(STATE)
-        
+
         from linuxwhisper.managers.chat import ChatManager
         if not STATE.chat_enabled:
             ChatManager._destroy()

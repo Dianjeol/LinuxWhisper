@@ -45,7 +45,7 @@ html, body {{
   height: 100%;
   background: transparent !important;
   font-family: 'Inter', 'Ubuntu', system-ui, -apple-system, sans-serif;
-  color: {text}; 
+  color: {text};
   font-size: 14px;
   line-height: 1.6;
   overflow: hidden; /* Hide native window scrollbar */
@@ -55,7 +55,7 @@ html, body {{
 
 /* Rounded Window Container */
 .chat-window {{
-  display: flex; 
+  display: flex;
   flex-direction: column;
   height: 100%;
   background-color: {bg_rgba};
@@ -229,7 +229,7 @@ const checkIcon = '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41
 function copyText(btn, index) {
   // Use custom protocol to let Python handle clipboard safely
   window.location.href = "copy://" + index;
-  
+
   // Optimistic UI update
   btn.innerHTML = checkIcon;
   btn.classList.add('copied');
@@ -243,14 +243,14 @@ function signalDrag() {
 function copyCode(btn) {
   const code = btn.nextElementSibling.querySelector('code');
   if (!code) return;
-  
+
   const text = code.innerText;
   // Use robust postMessage IPC for large content
   window.webkit.messageHandlers.signal.postMessage(JSON.stringify({
     action: 'CopyContent',
     content: text
   }));
-  
+
   // Feedback
   btn.innerHTML = checkIcon;
   btn.classList.add('copied');
@@ -261,17 +261,17 @@ function copyCode(btn) {
 function checkScroll(smooth=true) {
   const scrollArea = document.getElementById('scroll-area');
   if (!scrollArea) return;
-  
+
   const scrollToBottom = () => {
-    scrollArea.scrollTo({ 
-      top: scrollArea.scrollHeight, 
-      behavior: smooth ? 'smooth' : 'auto' 
+    scrollArea.scrollTo({
+      top: scrollArea.scrollHeight,
+      behavior: smooth ? 'smooth' : 'auto'
     });
   };
 
   // Immediate scroll
   scrollToBottom();
-  
+
   // Backup scrolls to account for rendering delays and images
   requestAnimationFrame(scrollToBottom);
   setTimeout(scrollToBottom, 50);
@@ -533,7 +533,7 @@ class ChatOverlay(Gtk.Window):
             accent_alpha20=hex_to_rgba(scheme["accent"], 0.2),
             accent_alpha30=hex_to_rgba(scheme["accent"], 0.3),
             text=scheme["text"],
-            text_on_accent=scheme["text"] if STATE.color_scheme == "Pink Orchid" else get_contrast_text(scheme["accent"]),
+            text_on_accent=get_contrast_text(scheme["accent"]),
             success=scheme["accent"],
             dim_text=hex_to_rgba(scheme["text"], 0.6),
             selection_alpha90=hex_to_rgba(scheme["accent"], 0.3),
@@ -544,10 +544,13 @@ class ChatOverlay(Gtk.Window):
             black_alpha40=hex_to_rgba(scheme["bg"], 0.4)
         )
 
-        html = CHAT_HTML_TEMPLATE.replace("{messages}", "\n".join(html_messages))
-        html = html.replace("{pin_hint}", pin_hint)
-        html = html.replace("{CHAT_CSS}", formatted_css)
-        html = html.replace("{CHAT_JS}", CHAT_JS)
+        # Single-pass formatting: message content can never collide with placeholders
+        html = CHAT_HTML_TEMPLATE.format(
+            messages="\n".join(html_messages),
+            pin_hint=pin_hint,
+            CHAT_CSS=formatted_css,
+            CHAT_JS=CHAT_JS,
+        )
 
         self.webview.load_html(html, None)
 

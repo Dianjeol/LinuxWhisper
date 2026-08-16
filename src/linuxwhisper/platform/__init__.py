@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import os
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from linuxwhisper.platform.base import ClipboardBackend, InputBackend, ScreenshotBackend
@@ -53,12 +53,12 @@ logger.info("Detected session type: %s", SESSION_TYPE)
 # Singleton backend instances (lazy-initialized)
 # ---------------------------------------------------------------------------
 
-_clipboard: ClipboardBackend | None = None
-_input: InputBackend | None = None
-_screenshot: ScreenshotBackend | None = None
+_clipboard: Optional["ClipboardBackend"] = None
+_input: Optional["InputBackend"] = None
+_screenshot: Optional["ScreenshotBackend"] = None
 
 
-def get_clipboard() -> ClipboardBackend:
+def get_clipboard() -> "ClipboardBackend":
     """Get the platform-specific clipboard backend (singleton)."""
     global _clipboard
     if _clipboard is None:
@@ -71,7 +71,7 @@ def get_clipboard() -> ClipboardBackend:
     return _clipboard
 
 
-def get_input() -> InputBackend:
+def get_input() -> "InputBackend":
     """Get the platform-specific input simulation backend (singleton)."""
     global _input
     if _input is None:
@@ -84,7 +84,7 @@ def get_input() -> InputBackend:
     return _input
 
 
-def get_screenshot() -> ScreenshotBackend:
+def get_screenshot() -> "ScreenshotBackend":
     """Get the platform-specific screenshot backend (singleton)."""
     global _screenshot
     if _screenshot is None:

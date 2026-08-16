@@ -33,7 +33,7 @@ class ChatManager:
         """Toggle chat overlay pin mode."""
         if not STATE.chat_enabled:
             return
-            
+
         STATE.chat_pinned = not STATE.chat_pinned
 
         if not STATE.chat_pinned and STATE.chat_overlay_window:

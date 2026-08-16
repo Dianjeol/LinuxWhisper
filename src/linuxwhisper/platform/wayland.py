@@ -92,7 +92,7 @@ class WaylandInput(InputBackend):
                 title = (info.get("title") or "").lower()
                 combined = f"{app_id} {title}"
                 return any(kw in combined for kw in _TERMINAL_KEYWORDS)
-        except (FileNotFoundError, json.JSONDecodeError, Exception):
+        except Exception:
             pass
 
         # Fallback: cannot detect → safe default (Ctrl+V)

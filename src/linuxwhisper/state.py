@@ -13,19 +13,6 @@ import sounddevice as sd
 
 from linuxwhisper.config import CFG
 
-import gi
-gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk
-
-# AyatanaAppIndicator3 is optional — may not be available on all systems.
-try:
-    gi.require_version('AyatanaAppIndicator3', '0.1')
-    from gi.repository import AyatanaAppIndicator3 as AppIndicator
-    HAS_APP_INDICATOR = True
-except (ValueError, ImportError):
-    AppIndicator = None
-    HAS_APP_INDICATOR = False
-
 
 # ---------------------------------------------------------------------------
 # Settings persistence
@@ -108,7 +95,7 @@ class AppState:
 
     # --- System Tray ---
     indicator: Optional[Any] = None  # AppIndicator.Indicator or None
-    gtk_menu: Optional[Gtk.Menu] = None
+    gtk_menu: Optional[Any] = None   # Gtk.Menu or None
 
     # --- UI Persistence ---
     last_chat_position: Optional[Tuple[int, int]] = None

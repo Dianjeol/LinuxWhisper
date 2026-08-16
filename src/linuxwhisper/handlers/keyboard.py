@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import selectors
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 import evdev
 from evdev import InputDevice, categorize, ecodes
@@ -175,7 +175,8 @@ class KeyboardHandler:
             sel.register(dev, selectors.EVENT_READ)
 
         try:
-            while True:
+            # Loop exits automatically once all devices are gone
+            while sel.get_map():
                 for key, _ in sel.select():
                     device = key.fileobj
                     try:
@@ -186,9 +187,7 @@ class KeyboardHandler:
                         # Device disconnected — unregister and continue
                         logger.warning("Device disconnected: %s", device.path)
                         sel.unregister(device)
-                        if not sel.get_map():
-                            logger.error("All keyboard devices disconnected!")
-                            break
+            logger.error("All keyboard devices disconnected!")
         except Exception as e:
             logger.error("Keyboard listener error: %s", e)
         finally:

@@ -49,14 +49,9 @@ class ModeHandler:
     @staticmethod
     def _process_worker(mode: str, audio_data: np.ndarray) -> None:
         """Worker thread for processing audio."""
-        transcribed = None
-        try:
-            transcribed = AudioService.transcribe(audio_data)
-        except Exception:
-            pass
-
+        transcribed = AudioService.transcribe(audio_data)
         if transcribed:
-            # Run processing (API calls etc)
+            # Run processing (API calls etc) on the GTK main thread
             GLib.idle_add(lambda: ModeHandler.process(mode, transcribed))
 
     @staticmethod

@@ -12,7 +12,6 @@ os.environ["LIBGL_ALWAYS_SOFTWARE"] = "1"
 os.environ["WEBKIT_DISABLE_COMPOSITING_MODE"] = "1"
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
-warnings.filterwarnings("ignore", message=".*Specified provider 'CUDAExecutionProvider'.*")
 
 from linuxwhisper.config import CFG
 from linuxwhisper.handlers.keyboard import KeyboardHandler

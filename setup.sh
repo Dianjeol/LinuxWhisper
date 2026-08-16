@@ -50,7 +50,7 @@ if [ "$DISTRO" = "debian" ]; then
         python3-venv python3-pip \
         libgirepository1.0-dev gcc libcairo2-dev pkg-config python3-dev \
         gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1 gir1.2-webkit2-4.1 \
-        libspeexdsp-dev xclip
+        libspeexdsp-dev xclip alsa-utils
 
     if [ "$SESSION_TYPE" = "wayland" ]; then
         echo -e "${BLUE}📦 Installing Wayland-specific packages...${NC}"
@@ -63,7 +63,7 @@ elif [ "$DISTRO" = "fedora" ]; then
     sudo dnf install -y \
         python3 gcc python3-devel pkgconf cairo-devel gobject-introspection-devel \
         gtk3 libayatana-appindicator-gtk3 webkit2gtk4.1 speexdsp-devel \
-        python3-pip xclip
+        python3-pip xclip alsa-utils
 
     if [ "$SESSION_TYPE" = "wayland" ]; then
         echo -e "${BLUE}📦 Installing Wayland-specific packages...${NC}"
@@ -77,7 +77,7 @@ elif [ "$DISTRO" = "arch" ]; then
         python python-pip \
         gobject-introspection gcc cairo pkgconf \
         gtk3 libayatana-appindicator webkit2gtk-4.1 \
-        speexdsp python-evdev
+        speexdsp python-evdev alsa-utils
 
     if [ "$SESSION_TYPE" = "wayland" ]; then
         echo -e "${BLUE}📦 Installing Wayland-specific packages...${NC}"

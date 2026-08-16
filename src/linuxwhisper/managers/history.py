@@ -4,7 +4,6 @@ Conversation and answer history management.
 from __future__ import annotations
 
 import time
-from typing import Dict, List
 
 from linuxwhisper.config import CFG
 from linuxwhisper.state import STATE

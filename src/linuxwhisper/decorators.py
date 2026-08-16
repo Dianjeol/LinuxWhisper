@@ -3,12 +3,15 @@ Utility decorators for error handling and GTK thread scheduling.
 """
 from __future__ import annotations
 
+import logging
 from functools import wraps
 from typing import Callable
 
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import GLib
+
+logger = logging.getLogger(__name__)
 
 
 def safe_execute(operation: str) -> Callable:
@@ -40,8 +43,7 @@ def run_on_main_thread(func: Callable) -> Callable:
             try:
                 func(*args, **kwargs)
             except Exception as e:
-                import logging
-                logging.getLogger(__name__).error("Main-thread callback error: %s", e)
+                logger.error("Main-thread callback error: %s", e)
             return False  # Run once only
         GLib.idle_add(_callback)
     return wrapper
