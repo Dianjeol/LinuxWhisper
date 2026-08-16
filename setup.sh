@@ -62,7 +62,7 @@ if [ "$DISTRO" = "debian" ]; then
 elif [ "$DISTRO" = "fedora" ]; then
     sudo dnf install -y \
         python3 gcc python3-devel pkgconf cairo-devel gobject-introspection-devel \
-        gtk3 libayatana-appindicator webkit2gtk4.1 speexdsp-devel \
+        gtk3 libayatana-appindicator-gtk3 webkit2gtk4.1 speexdsp-devel \
         python3-pip xclip
 
     if [ "$SESSION_TYPE" = "wayland" ]; then
