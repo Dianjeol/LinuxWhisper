@@ -16,6 +16,8 @@ echo -e "${BLUE}🛠  LinuxWhisper Setup${NC}"
 detect_distro() {
     if command -v pacman &>/dev/null; then
         echo "arch"
+    elif command -v dnf &>/dev/null; then
+        echo "fedora"
     elif command -v apt &>/dev/null; then
         echo "debian"
     else
@@ -27,7 +29,7 @@ DISTRO=$(detect_distro)
 echo -e "${BLUE}📋 Detected distribution: ${DISTRO}${NC}"
 
 if [ "$DISTRO" = "unknown" ]; then
-    echo -e "${RED}❌ Error: Unsupported distribution. This script supports Debian/Ubuntu (apt) and Arch Linux (pacman).${NC}"
+    echo -e "${RED}❌ Error: Unsupported distribution. This script supports Debian/Ubuntu (apt), Fedora/RHEL (dnf) and Arch Linux (pacman).${NC}"
     exit 1
 fi
 
@@ -55,6 +57,19 @@ if [ "$DISTRO" = "debian" ]; then
         sudo apt install -y wtype wl-clipboard grim gtk-layer-shell-dev
     else
         sudo apt install -y xdotool gnome-screenshot
+    fi
+
+elif [ "$DISTRO" = "fedora" ]; then
+    sudo dnf install -y \
+        python3 gcc python3-devel pkgconf cairo-devel gobject-introspection-devel \
+        gtk3 libayatana-appindicator webkit2gtk4.1 speexdsp-devel \
+        python3-pip xclip
+
+    if [ "$SESSION_TYPE" = "wayland" ]; then
+        echo -e "${BLUE}📦 Installing Wayland-specific packages...${NC}"
+        sudo dnf install -y wtype wl-clipboard grim gtk-layer-shell-devel
+    else
+        sudo dnf install -y xdotool gnome-screenshot
     fi
 
 elif [ "$DISTRO" = "arch" ]; then

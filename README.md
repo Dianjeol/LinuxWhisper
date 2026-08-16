@@ -36,6 +36,8 @@
 |:---|:---|:---|
 | **Debian / Ubuntu** | X11 | ✅ Fully supported |
 | **Debian / Ubuntu** | Wayland | ✅ Supported |
+| **Fedora / RHEL** | X11 | ✅ Supported |
+| **Fedora / RHEL** | Wayland | ✅ Supported |
 | **Arch Linux** | X11 | ✅ Supported |
 | **Arch Linux** | Wayland / **Niri** | ✅ Fully supported |
 
@@ -67,7 +69,7 @@ The app auto-detects your session type (X11 or Wayland) and uses the appropriate
 ## 🛠️ Quick Start
 
 ### 1. Requirements
-*   **Linux** (Debian/Ubuntu or Arch Linux)
+*   **Linux** (Debian/Ubuntu, Fedora/RHEL or Arch Linux)
 *   **Groq API Key**: [Get your free key here](https://console.groq.com)
 *   **User in `input` group** (for global hotkeys):
     ```bash
