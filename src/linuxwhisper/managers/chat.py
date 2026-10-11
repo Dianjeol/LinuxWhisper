@@ -29,14 +29,15 @@ class ChatManager:
         ChatManager.refresh_overlay()
 
     @staticmethod
-    def toggle_pin() -> None:
-        """Toggle chat overlay pin mode."""
+    def set_pinned(pinned: bool) -> None:
+        """Set pin (always-on-top) state for the chat overlay."""
+        STATE.chat_pinned = pinned
+
+        # Nothing to show while the overlay is switched off.
         if not STATE.chat_enabled:
             return
 
-        STATE.chat_pinned = not STATE.chat_pinned
-
-        if not STATE.chat_pinned and STATE.chat_overlay_window:
+        if not pinned and STATE.chat_overlay_window:
             ChatManager._cancel_timer()
             STATE.chat_overlay_window.start_fade_out(callback=ChatManager._destroy)
         else:
@@ -66,9 +67,7 @@ class ChatManager:
 
         STATE.chat_overlay_window.update_content(
             STATE.chat_messages,
-            status_text,
-            is_pinned=STATE.chat_pinned,
-            is_tts=STATE.tts_enabled
+            status_text
         )
 
         if not STATE.chat_pinned:

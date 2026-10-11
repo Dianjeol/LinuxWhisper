@@ -29,6 +29,14 @@ class OverlayManager:
 
     @staticmethod
     @run_on_main_thread
+    def set_text(text: str) -> None:
+        """Show the running transcript on the recording overlay."""
+        window = STATE.overlay_window
+        if window is not None:
+            window.set_transcript(text)
+
+    @staticmethod
+    @run_on_main_thread
     def hide() -> None:
         """Hide overlay."""
         OverlayManager._hide_impl()

@@ -4,8 +4,7 @@ Unified handler for all recording modes.
 from __future__ import annotations
 
 import threading
-
-import numpy as np
+from typing import Optional
 
 from linuxwhisper.decorators import run_on_main_thread
 from linuxwhisper.managers.chat import ChatManager
@@ -27,6 +26,18 @@ from gi.repository import GLib
 class ModeHandler:
     """Unified handler for all recording modes."""
 
+    # Speech-to-text engines hallucinate these from silence; filtering them out
+    # prevents stray words (and dictation loops).
+    _HALLUCINATIONS = {"thank you", "you're welcome", "thanks", "subtitle", "untertitel", "you"}
+
+    @staticmethod
+    def _accepted_text(text: str) -> Optional[str]:
+        """Return the text, or None when it looks like a silence artifact."""
+        clean = text.strip().lower().replace(".", "").replace("!", "")
+        if clean in ModeHandler._HALLUCINATIONS or len(clean) < 2:
+            return None
+        return text
+
     @staticmethod
     @run_on_main_thread
     def stop_recording_safe() -> None:
@@ -36,20 +47,19 @@ class ModeHandler:
 
         print("🛑 Voice Stop Triggered (Silence)")
         OverlayManager.hide()
-        audio_data = AudioService.stop_recording()
 
-        if audio_data is not None:
+        if AudioService.stop_recording():
             # Process in background
             threading.Thread(
                 target=ModeHandler._process_worker,
-                args=(STATE.current_mode, audio_data),
+                args=(STATE.current_mode,),
                 daemon=True
             ).start()
 
     @staticmethod
-    def _process_worker(mode: str, audio_data: np.ndarray) -> None:
-        """Worker thread for processing audio."""
-        transcribed = AudioService.transcribe(audio_data)
+    def _process_worker(mode: str) -> None:
+        """Worker thread for finishing the transcription."""
+        transcribed = AudioService.transcribe()
         if transcribed:
             # Run processing (API calls etc) on the GTK main thread
             GLib.idle_add(lambda: ModeHandler.process(mode, transcribed))
@@ -58,11 +68,9 @@ class ModeHandler:
     def process(mode: str, transcribed_text: str) -> None:
         """Route to appropriate handler based on mode."""
         # --- Hallucination Guard ---
-        # Whisper often outputs "Thank you", "You're welcome", or "Subtitle" on silence.
-        # We filter these out to prevent weird loops.
-        clean = transcribed_text.strip().lower().replace(".", "").replace("!", "")
-        hallucinations = {"thank you", "you're welcome", "thanks", "subtitle", "untertitel", "you"}
-        if clean in hallucinations or len(clean) < 2:
+        # The speech-to-text engine outputs "Thank you", "You're welcome" or
+        # "Subtitle" on silence; filtering these out prevents weird loops.
+        if ModeHandler._accepted_text(transcribed_text) is None:
             print(f"⚠️ Ignored Hallucination: '{transcribed_text}'")
             return
 

@@ -97,11 +97,23 @@ class TrayManager:
         chat_toggle.connect("toggled", TrayManager._toggle_chat)
         menu.append(chat_toggle)
 
+        # Pin (always on top) for the chat overlay
+        pin_toggle = Gtk.CheckMenuItem(label="Pin Chat Overlay")
+        pin_toggle.set_active(STATE.chat_pinned)
+        pin_toggle.connect("toggled", TrayManager._toggle_pin)
+        menu.append(pin_toggle)
+
         # Toggle mode (hold vs press-to-toggle)
         toggle_mode = Gtk.CheckMenuItem(label="Toggle Mode (Press to Record)")
         toggle_mode.set_active(STATE.toggle_mode)
         toggle_mode.connect("toggled", TrayManager._toggle_mode)
         menu.append(toggle_mode)
+
+        # Voice feedback (TTS)
+        tts_toggle = Gtk.CheckMenuItem(label="Voice Feedback (TTS)")
+        tts_toggle.set_active(STATE.tts_enabled)
+        tts_toggle.connect("toggled", TrayManager._toggle_tts)
+        menu.append(tts_toggle)
 
         # Settings
         settings_item = Gtk.MenuItem(label="Settings")
@@ -139,6 +151,24 @@ class TrayManager:
             ChatManager._destroy()
         else:
             ChatManager.refresh_overlay()
+
+    @staticmethod
+    def _toggle_pin(widget) -> None:
+        """Toggle 'always on top' for the chat overlay."""
+        from linuxwhisper.managers.chat import ChatManager
+        from linuxwhisper.state import SettingsManager
+
+        ChatManager.set_pinned(widget.get_active())
+        SettingsManager.save(STATE)
+
+    @staticmethod
+    def _toggle_tts(widget) -> None:
+        """Toggle voice feedback for AI responses."""
+        from linuxwhisper.services.tts import TTSService
+        from linuxwhisper.state import SettingsManager
+
+        TTSService.set_enabled(widget.get_active())
+        SettingsManager.save(STATE)
 
     @staticmethod
     def _toggle_mode(widget) -> None:

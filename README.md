@@ -8,7 +8,9 @@
 
 [![Python 3.8+](https://img.shields.io/badge/Python-3.8%2B-blue?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald?style=for-the-badge)](LICENSE)
-[![Groq Powered](https://img.shields.io/badge/AI-Groq%20Cloud-orange?style=for-the-badge)](https://groq.com)
+[![Chat & Rewrite: OpenRouter](https://img.shields.io/badge/Chat%20%26%20Rewrite-OpenRouter-6467F2?style=for-the-badge)](https://openrouter.ai)
+[![Vision & TTS: Groq](https://img.shields.io/badge/Vision%20%26%20TTS-Groq-FF6B35?style=for-the-badge)](https://groq.com)
+[![Dictation: Deepgram](https://img.shields.io/badge/Dictation-Deepgram%20Nova--3-13EF93?style=for-the-badge)](https://deepgram.com)
 
 ---
 
@@ -22,11 +24,12 @@
 
 ## Features
 
-- 🎙️ **Dictation**: Voice-to-text at your cursor using **Whisper-v3**.
-- 💬 **AI Chat**: Helpful Q&A and conversation.
+- 🎙️ **Dictation**: Voice-to-text at your cursor using **Deepgram Nova-3** (live streaming; the
+  recording overlay shows the transcript while you speak, the finished text is inserted on release).
+- 💬 **AI Chat**: Helpful Q&A and conversation on **OpenRouter** (`deepseek/deepseek-v4.1-flash`).
 - ✍️ **Smart Rewrite**: Modify selected text using your voice.
-- 👁️ **Vision**: Understand screenshots using **Llama 4**.
-- 🔊 **Voice Feedback**: Optional text-to-speech for AI responses.
+- 👁️ **Vision**: Understand screenshots using **Qwen3.8** (`qwen/qwen3.8-27b` on Groq).
+- 🔊 **Voice Feedback**: Optional text-to-speech for AI responses (toggle in the tray menu).
 
 ---
 
@@ -39,6 +42,7 @@
 | **Fedora / RHEL** | X11 | ✅ Supported |
 | **Fedora / RHEL** | Wayland | ✅ Supported |
 | **Arch Linux** | X11 | ✅ Supported |
+| **Arch Linux** | Wayland / **Hyprland** (Omarchy) | ✅ Supported |
 | **Arch Linux** | Wayland / **Niri** | ✅ Fully supported |
 
 The app auto-detects your session type (X11 or Wayland) and uses the appropriate backends:
@@ -55,14 +59,15 @@ The app auto-detects your session type (X11 or Wayland) and uses the appropriate
 
 ## ⌨️ Command Center
 
-| Key | Action | Purpose |
-|:---:|:---|:---|
-| `F3` | **Dictate** | Transcribe voice to text at cursor |
-| `F4` | **Chat** | Open/Focus AI conversation |
-| `F7` | **Rewrite** | Highlight text → Speak to modify |
-| `F8` | **Vision** | Screenshot + Intelligent Analysis |
-| `F9` | **Pin** | Toggle "Always on Top" for chat |
-| `F10` | **TTS** | Toggle AI voice feedback |
+| Key | Action | Purpose | Backend / Model |
+|:---:|:---|:---|:---|
+| `F3` / R-Alt | **Dictate** | Transcribe voice to text at cursor | Deepgram `nova-3` (streaming, `language=multi`) |
+| `F4` | **Chat** | Open/Focus AI conversation | OpenRouter `deepseek/deepseek-v4.1-flash` |
+| `F8` | **Vision** | Screenshot + Intelligent Analysis | Groq `qwen/qwen3.8-27b` |
+| `F9` | **Rewrite** | Highlight text → Speak to modify | OpenRouter `deepseek/deepseek-v4.1-flash` |
+
+Pinning the chat overlay and voice feedback have no hotkey — both live in the tray menu
+(see the tip below). TTS uses Groq `canopylabs/orpheus-v1-english`.
 
 ---
 
@@ -70,7 +75,12 @@ The app auto-detects your session type (X11 or Wayland) and uses the appropriate
 
 ### 1. Requirements
 *   **Linux** (Debian/Ubuntu, Fedora/RHEL or Arch Linux)
-*   **Groq API Key**: [Get your free key here](https://console.groq.com)
+*   **OpenRouter API Key**: [openrouter.ai/keys](https://openrouter.ai/keys) — used by chat and
+    rewrite (`deepseek/deepseek-v4.1-flash`)
+*   **Groq API Key**: [Get your free key here](https://console.groq.com) — used by vision
+    (`qwen/qwen3.8-27b`) and TTS
+*   **Deepgram API Key**: [console.deepgram.com](https://console.deepgram.com) — dictation is transcribed by
+    Deepgram's streaming API (`nova-3`, `language=multi`)
 *   **User in `input` group** (for global hotkeys):
     ```bash
     sudo usermod -aG input $USER
@@ -87,10 +97,12 @@ The setup script automatically detects your distribution and session type, then 
 
 ### 3. Launch
 ```bash
-# Set your API Key once
+# Set your API Keys once
+export OPENROUTER_API_KEY="your_key"
 export GROQ_API_KEY="your_key"
+export DEEPGRAM_API_KEY="your_key"
 
-# Start the whisperer
+# Start the assistant
 linuxwhisper
 
 # Or alternatively:
@@ -99,6 +111,9 @@ python -m linuxwhisper
 
 > [!TIP]
 > Use the **System Tray** icon or the ⚙️ icon in the chat overlay to adjust TTS voices and preferences.
+> **Pin Chat Overlay** (stay visible instead of auto-hiding) and **Voice Feedback (TTS)** are toggled in the
+> tray menu — they no longer have hotkeys. Pinning is off by default, so the chat overlay hides itself again
+> after a few seconds.
 
 ---
 
@@ -118,6 +133,10 @@ layer-rule {
 }
 ```
 
+### Hyprland / Omarchy Users
+
+No extra compositor rules needed — the overlays use `gtk-layer-shell`, which Hyprland supports natively.
+
 ---
 
 ## 📂 Project Structure
@@ -129,7 +148,7 @@ src/linuxwhisper/
 ├── app.py               # main() entry point
 ├── config.py            # Config dataclass + CFG singleton
 ├── state.py             # AppState + SettingsManager + STATE
-├── api.py               # Groq client initialization
+├── api.py               # Groq + OpenRouter client initialization
 ├── decorators.py        # safe_execute, run_on_main_thread
 ├── platform/
 │   ├── __init__.py      # Session detection + backend factory
@@ -137,7 +156,8 @@ src/linuxwhisper/
 │   ├── x11.py           # X11 backends (xdotool, xclip, gnome-screenshot)
 │   └── wayland.py       # Wayland backends (wtype, wl-clipboard, grim)
 ├── services/
-│   ├── audio.py         # AudioService (recording + transcription)
+│   ├── audio.py         # AudioService (recording + streaming to Deepgram)
+│   ├── deepgram.py      # DeepgramLiveSession (live WebSocket transcription)
 │   ├── ai.py            # AIService (chat + vision)
 │   ├── tts.py           # TTSService (Orpheus voice)
 │   ├── clipboard.py     # ClipboardService (uses platform backends)

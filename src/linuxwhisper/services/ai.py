@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from linuxwhisper.api import GROQ_CLIENT
+from linuxwhisper.api import GROQ_CLIENT, OPENROUTER_CLIENT
 from linuxwhisper.config import CFG
 from linuxwhisper.decorators import safe_execute
 from linuxwhisper.state import STATE
@@ -25,13 +25,11 @@ class AIService:
     @staticmethod
     @safe_execute("AI Chat")
     def chat(prompt: str) -> Optional[str]:
-        """Send chat completion request."""
+        """Send chat completion request (OpenRouter)."""
+        if OPENROUTER_CLIENT is None:
+            raise RuntimeError("OPENROUTER_API_KEY is not set — add it to ~/.bashrc")
         messages = AIService.build_messages(prompt)
-        response = GROQ_CLIENT.chat.completions.create(
-            model=CFG.MODEL_CHAT,
-            messages=messages
-        )
-        return response.choices[0].message.content
+        return OPENROUTER_CLIENT.chat(CFG.MODEL_CHAT, messages)
 
     @staticmethod
     @safe_execute("AI Vision")

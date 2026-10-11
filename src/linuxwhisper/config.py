@@ -100,11 +100,18 @@ class Config:
     CHAT_MESSAGE_LIMIT: int = 20
     CHAT_AUTO_HIDE_SEC: int = 3
 
-    # --- AI Models ---
-    MODEL_CHAT: str = "openai/gpt-oss-120b"
-    MODEL_VISION: str = "qwen/qwen3.6-27b"
-    MODEL_WHISPER: str = "whisper-large-v3"
+    # --- AI Models (OpenRouter: chat/rewrite · Groq: vision, TTS) ---
+    MODEL_CHAT: str = "deepseek/deepseek-v4.1-flash"
+    MODEL_VISION: str = "qwen/qwen3.8-27b"
     MODEL_TTS: str = "canopylabs/orpheus-v1-english"
+
+    # --- API Providers ---
+    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
+    OPENROUTER_TIMEOUT: float = 120.0
+
+    # --- Deepgram (streaming speech-to-text) ---
+    DEEPGRAM_MODEL: str = "nova-3"
+    DEEPGRAM_LANGUAGE: str = "multi"
 
     # --- TTS Voices ---
     TTS_VOICES: Tuple[str, ...] = ("diana", "hannah", "autumn", "austin", "daniel", "troy")
@@ -137,10 +144,8 @@ class Config:
     HOTKEY_DEFS: Dict[str, Tuple[str, int, List[int]]] = field(default_factory=lambda: {
         "dictation":  ("R-Alt / F3",  ecodes.KEY_RIGHTALT,  [ecodes.KEY_F3, ecodes.KEY_F13]),
         "ai":         ("F4",  ecodes.KEY_F4,  [ecodes.KEY_F14]),
-        "ai_rewrite": ("F7",  ecodes.KEY_F7,  [ecodes.KEY_PREVIOUSSONG]),
+        "ai_rewrite": ("F9",  ecodes.KEY_F9,  [ecodes.KEY_PREVIOUSSONG]),
         "vision":     ("F8",  ecodes.KEY_F8,  [ecodes.KEY_PLAYPAUSE]),
-        "pin":        ("F9",  ecodes.KEY_F9,  [ecodes.KEY_NEXTSONG]),
-        "tts":        ("F10", ecodes.KEY_F10, [ecodes.KEY_MUTE]),
     })
 
 

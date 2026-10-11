@@ -16,11 +16,9 @@ from evdev import InputDevice, categorize, ecodes
 
 from linuxwhisper.config import CFG
 from linuxwhisper.handlers.mode import ModeHandler
-from linuxwhisper.managers.chat import ChatManager
 from linuxwhisper.managers.overlay import OverlayManager
 from linuxwhisper.services.audio import AudioService
 from linuxwhisper.services.clipboard import ClipboardService
-from linuxwhisper.services.tts import TTSService
 from linuxwhisper.state import STATE
 
 logger = logging.getLogger(__name__)
@@ -94,18 +92,6 @@ class KeyboardHandler:
     @classmethod
     def _on_press(cls, mode: str) -> None:
         """Handle key press for a recognized mode."""
-        # Pin toggle (non-recording action)
-        if mode == "pin":
-            if not STATE.recording:
-                ChatManager.toggle_pin()
-            return
-
-        # TTS toggle (non-recording action)
-        if mode == "tts":
-            if not STATE.recording:
-                TTSService.toggle()
-            return
-
         # Toggle mode: pressing same key again stops recording
         if STATE.recording and STATE.toggle_mode:
             if mode == STATE.current_mode:
@@ -144,10 +130,9 @@ class KeyboardHandler:
     def _stop_and_process(cls) -> None:
         """Stop recording, transcribe, and process result."""
         OverlayManager.hide()
-        audio_data = AudioService.stop_recording()
 
-        if audio_data is not None:
-            transcribed = AudioService.transcribe(audio_data)
+        if AudioService.stop_recording():
+            transcribed = AudioService.transcribe()
             if transcribed:
                 ModeHandler.process(STATE.current_mode, transcribed)
 

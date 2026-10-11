@@ -102,8 +102,6 @@ class SettingsDialog:
             "ai": "AI Chat:",
             "ai_rewrite": "Rewrite:",
             "vision": "Vision:",
-            "pin": "Pin Chat:",
-            "tts": "TTS Toggle:",
         }
 
         for mode_id, (label, _, _) in CFG.HOTKEY_DEFS.items():

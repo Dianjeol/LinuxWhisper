@@ -92,8 +92,8 @@ html, body {{
 .chat-scroll-area::-webkit-scrollbar-thumb {{ background: {white_alpha10}; border-radius: 3px; }}
 .chat-scroll-area::-webkit-scrollbar-thumb:hover {{ background: {white_alpha25}; }}
 
-/* HUD / Pin Hint - Static Header */
-.pin-hint {{
+/* HUD / Footer Hint - Static Header */
+.footer-hint {{
   flex-shrink: 0; /* Keep it fixed height */
   width: fit-content;
   margin: 12px auto 4px auto;
@@ -107,8 +107,8 @@ html, body {{
   transition: opacity 0.3s;
   cursor: default; position: relative;
 }}
-.pin-hint a {{ color: inherit; text-decoration: none; opacity: 0.8; transition: opacity 0.2s; cursor: pointer; }}
-.pin-hint a:hover {{ opacity: 1; color: {white}; }}
+.footer-hint a {{ color: inherit; text-decoration: none; opacity: 0.8; transition: opacity 0.2s; cursor: pointer; }}
+.footer-hint a:hover {{ opacity: 1; color: {white}; }}
 
 /* Chat Content */
 .chat-container {{
@@ -293,7 +293,7 @@ CHAT_HTML_TEMPLATE = '''<!DOCTYPE html>
 <body>
 <div class="chat-window">
   <div class="drag-handle" onmousedown="signalDrag()"></div>
-  {pin_hint}
+  {footer_hint}
   <div class="chat-scroll-area" id="scroll-area">
     <div id="chat" class="chat-container">{messages}</div>
   </div>
@@ -469,8 +469,7 @@ class ChatOverlay(Gtk.Window):
             GLib.source_remove(self.fade_timer)
             self.fade_timer = None
 
-    def update_content(self, messages: List[Dict[str, str]], status_text: Optional[str] = None,
-                       is_pinned: bool = False, is_tts: bool = False) -> None:
+    def update_content(self, messages: List[Dict[str, str]], status_text: Optional[str] = None) -> None:
         """Update chat content with markdown rendering."""
         html_messages = []
 
@@ -491,18 +490,9 @@ class ChatOverlay(Gtk.Window):
         if status_text:
             html_messages.append(f'<div class="message status">{status_text}</div>')
 
-        # Build pin hint - simple text with gear icon
-        pin_label = CFG.HOTKEY_DEFS["pin"][0]
-        tts_label = CFG.HOTKEY_DEFS["tts"][0]
-        pin_status = f"{pin_label}: Unpin" if is_pinned else f"{pin_label}: Pin"
-        voice_status = f"{tts_label}: Mute" if is_tts else f"{tts_label}: Voice"
-
-        pin_hint = (
-            f'<div class="pin-hint">'
-            f'<span>{pin_status}</span>'
-            f'<span style="opacity:0.2; margin:0 4px">|</span>'
-            f'<span>{voice_status}</span>'
-            f'<span style="opacity:0.2; margin:0 4px">|</span>'
+        # Build footer hint - settings gear
+        footer_hint = (
+            f'<div class="footer-hint">'
             f'<a href="settings://open" class="settings-link" title="Settings">⚙️</a>'
             f'</div>'
         )
@@ -547,7 +537,7 @@ class ChatOverlay(Gtk.Window):
         # Single-pass formatting: message content can never collide with placeholders
         html = CHAT_HTML_TEMPLATE.format(
             messages="\n".join(html_messages),
-            pin_hint=pin_hint,
+            footer_hint=footer_hint,
             CHAT_CSS=formatted_css,
             CHAT_JS=CHAT_JS,
         )

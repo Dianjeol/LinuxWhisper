@@ -128,11 +128,19 @@ echo ""
 echo -e "${BLUE}🚀 Autostart Setup${NC}"
 read -p "Add LinuxWhisper to autostart? (y/N): " add_autostart
 if [[ "$add_autostart" =~ ^[yYjJ] ]]; then
-    # Parse GROQ_API_KEY from .bashrc or environment if it exists
-    API_KEY=""
-    if [ -f "$HOME/.bashrc" ]; then
-        API_KEY=$(grep -s "^export GROQ_API_KEY=" "$HOME/.bashrc" | tail -n 1 | cut -d'=' -f2- | tr -d "\"'")
-    fi
+    # Parse API keys from .bashrc: chat/rewrite OpenRouter, vision/TTS Groq, dictation Deepgram
+    AUTOSTART_ENV=""
+    for KEY_NAME in OPENROUTER_API_KEY GROQ_API_KEY DEEPGRAM_API_KEY; do
+        KEY_VALUE=""
+        if [ -f "$HOME/.bashrc" ]; then
+            KEY_VALUE=$(grep -s "^export $KEY_NAME=" "$HOME/.bashrc" | tail -n 1 | cut -d'=' -f2- | tr -d "\"'")
+        fi
+        if [ -n "$KEY_VALUE" ]; then
+            AUTOSTART_ENV="$AUTOSTART_ENV $KEY_NAME=\"$KEY_VALUE\""
+        else
+            echo -e "${BLUE}ℹ️ No $KEY_NAME found in .bashrc.${NC}"
+        fi
+    done
 
     AUTOSTART_DIR="$HOME/.config/autostart"
     mkdir -p "$AUTOSTART_DIR"
@@ -147,12 +155,12 @@ if [[ "$add_autostart" =~ ^[yYjJ] ]]; then
     
     EXEC_CMD="$PWD/venv/bin/linuxwhisper"
     
-    if [ -n "$API_KEY" ]; then
-        echo "Exec=env GROQ_API_KEY=\"$API_KEY\" $EXEC_CMD" >> "$DESKTOP_FILE"
-        echo -e "${GREEN}✅ GROQ_API_KEY loaded from .bashrc and added to autostart!${NC}"
+    if [ -n "$AUTOSTART_ENV" ]; then
+        echo "Exec=env$AUTOSTART_ENV $EXEC_CMD" >> "$DESKTOP_FILE"
+        echo -e "${GREEN}✅ API keys loaded from .bashrc and added to autostart!${NC}"
     else
         echo "Exec=$EXEC_CMD" >> "$DESKTOP_FILE"
-        echo -e "${BLUE}ℹ️ No GROQ_API_KEY found in .bashrc. Autostart created without key.${NC}"
+        echo -e "${BLUE}ℹ️ No API keys found in .bashrc. Autostart created without keys.${NC}"
     fi
     
     echo "Terminal=false" >> "$DESKTOP_FILE"
@@ -191,7 +199,7 @@ chmod -R a+rX venv
 
 echo ""
 echo "To run LinuxWhisper:"
-echo "  1. Set your API key: export GROQ_API_KEY=\"your_key\""
+echo "  1. Set your API keys: export OPENROUTER_API_KEY=\"your_key\" GROQ_API_KEY=\"your_key\""
 echo "  2. Run: linuxwhisper"
 echo "     Or:  python -m linuxwhisper"
 echo ""

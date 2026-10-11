@@ -1,19 +1,21 @@
 """
-Audio recording and transcription service.
+Audio recording and streaming transcription service.
+
+Captured audio goes straight to Deepgram while the hotkey is held, so the
+transcript only depends on the trailing audio when the hotkey is released.
 """
 from __future__ import annotations
 
-import io
 import queue
 from typing import Any, Optional
 
 import numpy as np
 import sounddevice as sd
-from scipy.io.wavfile import write as wav_write
 
-from linuxwhisper.api import GROQ_CLIENT
 from linuxwhisper.config import CFG
 from linuxwhisper.decorators import safe_execute
+from linuxwhisper.managers.overlay import OverlayManager
+from linuxwhisper.services.deepgram import DeepgramLiveSession
 from linuxwhisper.state import STATE
 
 
@@ -22,27 +24,35 @@ class AudioService:
 
     @staticmethod
     def audio_callback(indata: np.ndarray, frames: int, time_info: Any, status: Any) -> None:
-        """Capture audio chunks into buffer while recording."""
+        """Stream captured audio to Deepgram and the overlay visualizer."""
         if not STATE.recording:
             return
 
-        data_copy = indata.copy()
-
-        STATE.audio_buffer.append(data_copy)
+        session = STATE.deepgram
+        if session is not None:
+            # PortAudio reuses this buffer, so hand over a copy.
+            session.send(indata.copy())
 
         # Send downsampled data to visualization queue (skip if full)
         try:
             if STATE.viz_queue.qsize() < 5:
-                flat_data = data_copy[:, 0][::10]  # Downsample
-                STATE.viz_queue.put_nowait(flat_data)
+                STATE.viz_queue.put_nowait(indata[:, 0][::10])
         except Exception:
             pass
 
     @staticmethod
     def start_recording() -> None:
-        """Start audio recording stream."""
-        STATE.audio_buffer = []
+        """Open the transcription stream and start capturing audio."""
         AudioService._clear_viz_queue()
+
+        session = DeepgramLiveSession(
+            model=CFG.DEEPGRAM_MODEL,
+            language=CFG.DEEPGRAM_LANGUAGE,
+            sample_rate=CFG.SAMPLE_RATE,
+            on_partial=OverlayManager.set_text,
+        )
+        STATE.deepgram = session if session.start() else None
+
         STATE.stream = sd.InputStream(
             samplerate=CFG.SAMPLE_RATE,
             channels=1,
@@ -53,17 +63,26 @@ class AudioService:
         STATE.recording = True
 
     @staticmethod
-    def stop_recording() -> Optional[np.ndarray]:
-        """Stop recording and return audio data."""
+    def stop_recording() -> bool:
+        """Stop capturing audio; True if a transcript is still pending."""
         STATE.recording = False
         if STATE.stream:
             STATE.stream.stop()
             STATE.stream.close()
             STATE.stream = None
 
-        if STATE.audio_buffer:
-            return np.concatenate(STATE.audio_buffer, axis=0)
-        return None
+        return STATE.deepgram is not None
+
+    @staticmethod
+    @safe_execute("Transcription")
+    def transcribe() -> Optional[str]:
+        """Finish the Deepgram stream and return the final transcript."""
+        session = STATE.deepgram
+        STATE.deepgram = None
+        if session is None:
+            return None
+
+        return session.finish()
 
     @staticmethod
     def _clear_viz_queue() -> None:
@@ -73,18 +92,3 @@ class AudioService:
                 STATE.viz_queue.get_nowait()
             except queue.Empty:
                 break
-
-    @staticmethod
-    @safe_execute("Transcription")
-    def transcribe(audio_data: np.ndarray) -> Optional[str]:
-        """Transcribe audio using Groq Whisper."""
-        wav_buffer = io.BytesIO()
-        wav_buffer.name = "audio.wav"
-        wav_write(wav_buffer, CFG.SAMPLE_RATE, audio_data)
-        wav_buffer.seek(0)
-
-        transcript = GROQ_CLIENT.audio.transcriptions.create(
-            model=CFG.MODEL_WHISPER,
-            file=wav_buffer
-        )
-        return transcript.text.strip()

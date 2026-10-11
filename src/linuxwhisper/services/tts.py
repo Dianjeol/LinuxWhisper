@@ -36,9 +36,6 @@ class TTSService:
         threading.Thread(target=_speak_thread, daemon=True).start()
 
     @staticmethod
-    def toggle() -> None:
-        """Toggle TTS enabled state."""
-        STATE.tts_enabled = not STATE.tts_enabled
-        # Late import to avoid circular dependency
-        from linuxwhisper.managers.chat import ChatManager
-        ChatManager.refresh_overlay()
+    def set_enabled(enabled: bool) -> None:
+        """Enable or disable voice feedback."""
+        STATE.tts_enabled = enabled

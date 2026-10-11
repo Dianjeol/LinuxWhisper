@@ -8,7 +8,6 @@ import queue
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
 import sounddevice as sd
 
 from linuxwhisper.config import CFG
@@ -65,7 +64,7 @@ class AppState:
     # --- Recording State ---
     recording: bool = False
     current_mode: Optional[str] = None
-    audio_buffer: List[np.ndarray] = field(default_factory=list)
+    deepgram: Optional[Any] = None               # DeepgramLiveSession while recording
     stream: Optional[sd.InputStream] = None
     viz_queue: queue.Queue = field(default_factory=queue.Queue)
 
