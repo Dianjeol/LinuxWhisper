@@ -43,6 +43,10 @@ class SettingsManager:
                 "chat_pinned": state.chat_pinned,
                 "chat_enabled": state.chat_enabled,
                 "toggle_mode": state.toggle_mode,
+                "chat_provider": state.chat_provider,
+                "chat_model": state.chat_model,
+                "rewrite_provider": state.rewrite_provider,
+                "rewrite_model": state.rewrite_model,
             }
             with open(CFG.SETTINGS_FILE, "w") as f:
                 json.dump(data, f, indent=4)
@@ -86,6 +90,12 @@ class AppState:
     tts_enabled: bool = False  # Disabled by default
     tts_voice: str = CFG.TTS_DEFAULT_VOICE
 
+    # --- AI models per mode (provider + model id, editable in settings) ---
+    chat_provider: str = CFG.DEFAULT_PROVIDER
+    chat_model: str = CFG.MODEL_CHAT
+    rewrite_provider: str = CFG.DEFAULT_PROVIDER
+    rewrite_model: str = CFG.MODEL_REWRITE
+
     # --- Hotkey Mode ---
     toggle_mode: bool = False  # False = hold-to-record, True = press-to-toggle
 
@@ -114,6 +124,9 @@ class AppState:
             self.chat_enabled = saved["chat_enabled"]
         if "toggle_mode" in saved:
             self.toggle_mode = saved["toggle_mode"]
+        for key in ("chat_provider", "chat_model", "rewrite_provider", "rewrite_model"):
+            if key in saved:
+                setattr(self, key, saved[key])
 
 
 # Global state instance

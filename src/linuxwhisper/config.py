@@ -100,14 +100,23 @@ class Config:
     CHAT_MESSAGE_LIMIT: int = 20
     CHAT_AUTO_HIDE_SEC: int = 3
 
-    # --- AI Models (OpenRouter: chat/rewrite · Groq: vision, TTS) ---
+    # --- AI Models (per-mode defaults; the settings dialog can override) ---
     MODEL_CHAT: str = "deepseek/deepseek-v4.1-flash"
+    MODEL_REWRITE: str = "deepseek/deepseek-v4.1-flash"
     MODEL_VISION: str = "qwen/qwen3.8-27b"
     MODEL_TTS: str = "canopylabs/orpheus-v1-english"
 
     # --- API Providers ---
+    PROVIDERS: Tuple[str, str] = ("openrouter", "groq")
+    DEFAULT_PROVIDER: str = "openrouter"
+    # Preselected per provider when the provider is switched in settings.
+    DEFAULT_MODELS: Dict[str, str] = field(default_factory=lambda: {
+        "openrouter": "deepseek/deepseek-v4.1-flash",
+        "groq": "openai/gpt-oss-120b",
+    })
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
     OPENROUTER_TIMEOUT: float = 120.0
+    MODELS_TIMEOUT: float = 15.0
 
     # --- Deepgram (streaming speech-to-text) ---
     DEEPGRAM_MODEL: str = "nova-3"

@@ -332,7 +332,10 @@ class ChatOverlay(Gtk.Window):
         if USE_LAYER_SHELL:
             # --- Wayland: gtk-layer-shell ---
             GtkLayerShell.init_for_window(self)
-            GtkLayerShell.set_layer(self, GtkLayerShell.Layer.TOP)
+            # OVERLAY, not TOP: on Hyprland a TOP-level surface stays invisible
+            # (alpha 0) while it has no exclusive zone, so the chat never showed up.
+            GtkLayerShell.set_layer(self, GtkLayerShell.Layer.OVERLAY)
+            GtkLayerShell.set_exclusive_zone(self, -1)
             GtkLayerShell.set_namespace(self, "linuxwhisper-chat")
 
             # Anchor to right edge, vertically centered via margins
@@ -357,7 +360,10 @@ class ChatOverlay(Gtk.Window):
             y = geometry.y + (geometry.height - h) // 2
             self.move(x, y)
 
-        self.set_default_size(w, h)
+        # A size *request*, not set_default_size: gtk-layer-shell ignores the
+        # default size for the child allocation, so the WebView stayed unpainted
+        # (invisible overlay on Hyprland).
+        self.set_size_request(w, h)
 
     def _on_draw_window(self, widget: Gtk.Window, cr: cairo.Context) -> bool:
         """Clear window background to fixed transparency for rounded corners."""

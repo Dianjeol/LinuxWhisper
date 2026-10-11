@@ -1,26 +1,38 @@
 """
-GTK Settings dialog for voice and hotkey configuration.
+GTK Settings dialog for voice, AI model and hotkey configuration.
 """
 from __future__ import annotations
 
 import math
-from typing import Optional
+import threading
+from typing import Dict, List, Optional, Tuple
 
 import cairo
 
+from linuxwhisper.api import list_models
 from linuxwhisper.config import CFG
 from linuxwhisper.state import STATE, SettingsManager
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk
+from gi.repository import GLib, Gtk
+
+# Providers the model selectors offer, with display names.
+PROVIDER_TITLES = {"openrouter": "OpenRouter", "groq": "Groq"}
+
+# Placeholder shown while a provider's model list is being fetched.
+MODEL_LOADING_TEXT = "Loading models…"
 
 
 class SettingsDialog:
-    """GTK Settings dialog for voice and hotkey configuration."""
+    """GTK Settings dialog for voice, AI model and hotkey configuration."""
 
     _instance: Optional[Gtk.Window] = None
     _listbox: Optional[Gtk.ListBox] = None
+    # mode ("chat"/"rewrite") -> (provider combo, model combo)
+    _model_combos: Dict[str, Tuple[Gtk.ComboBoxText, Gtk.ComboBoxText]] = {}
+    # provider -> model ids, filled on first use
+    _model_cache: Dict[str, List[str]] = {}
 
     @classmethod
     def show(cls) -> None:
@@ -36,7 +48,7 @@ class SettingsDialog:
     def _create_dialog(cls) -> Gtk.Window:
         """Create the settings dialog window."""
         dialog = Gtk.Window(title="LinuxWhisper Settings")
-        dialog.set_default_size(400, 580)
+        dialog.set_default_size(420, 760)
         dialog.set_resizable(False)
         dialog.set_position(Gtk.WindowPosition.CENTER)
         dialog.set_keep_above(True)
@@ -61,6 +73,22 @@ class SettingsDialog:
         voice_combo.connect("changed", cls._on_voice_changed)
         vbox.pack_start(voice_combo, False, False, 0)
 
+        # --- AI Models Section ---
+        models_label = Gtk.Label()
+        models_label.set_halign(Gtk.Align.START)
+        models_label.set_markup("<b>AI Models</b>")
+        vbox.pack_start(models_label, False, False, 0)
+
+        vbox.pack_start(cls._create_model_selector("Chat (F4)", "chat"), False, False, 0)
+        vbox.pack_start(cls._create_model_selector("Rewrite (F9)", "rewrite"), False, False, 0)
+
+        model_hint = Gtk.Label()
+        model_hint.set_markup(
+            "<small><i>(Provider and model are stored in settings.json.)</i></small>"
+        )
+        model_hint.set_halign(Gtk.Align.START)
+        vbox.pack_start(model_hint, False, False, 0)
+
         # --- Color Scheme Gallery ---
         scheme_label = Gtk.Label()
         scheme_label.set_halign(Gtk.Align.START)
@@ -69,7 +97,7 @@ class SettingsDialog:
 
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        scrolled.set_size_request(-1, 280)
+        scrolled.set_size_request(-1, 230)
         scrolled.set_shadow_type(Gtk.ShadowType.IN)
 
         cls._listbox = Gtk.ListBox()
@@ -134,6 +162,130 @@ class SettingsDialog:
         dialog.connect("destroy", lambda w: setattr(cls, '_instance', None))
 
         return dialog
+
+    # -- AI model selection -------------------------------------------------
+    @classmethod
+    def _create_model_selector(cls, title: str, mode: str) -> Gtk.Box:
+        """Build a provider + model selector for one mode ("chat" or "rewrite")."""
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+
+        label = Gtk.Label(label=title)
+        label.set_markup(f"<b>{title}</b>")
+        label.set_halign(Gtk.Align.START)
+        box.pack_start(label, False, False, 0)
+
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+
+        provider_combo = Gtk.ComboBoxText()
+        for provider in CFG.PROVIDERS:
+            provider_combo.append(provider, PROVIDER_TITLES.get(provider, provider))
+        provider_combo.set_active_id(getattr(STATE, f"{mode}_provider"))
+        row.pack_start(provider_combo, False, False, 0)
+
+        model_combo = Gtk.ComboBoxText()
+        row.pack_start(model_combo, True, True, 0)
+        box.pack_start(row, False, False, 0)
+
+        cls._model_combos[mode] = (provider_combo, model_combo)
+        cls._refresh_models(mode, provider_combo.get_active_id(), getattr(STATE, f"{mode}_model"))
+
+        provider_combo.connect("changed", cls._on_provider_changed, mode)
+        model_combo.connect("changed", cls._on_model_changed, mode)
+        return box
+
+    @classmethod
+    def _refresh_models(cls, mode: str, provider: str, preferred: str) -> None:
+        """Fill a mode's model combo, fetching the provider catalog when needed."""
+        model_combo = cls._model_combos[mode][1]
+        models = cls._model_cache.get(provider)
+
+        if models is None:
+            model_combo.remove_all()
+            model_combo.append_text(MODEL_LOADING_TEXT)
+            model_combo.set_active(0)
+            model_combo.set_sensitive(False)
+            cls._request_models(mode, provider, preferred)
+            return
+
+        cls._apply_models(mode, provider, models, preferred)
+
+    @classmethod
+    def _request_models(cls, mode: str, provider: str, preferred: str) -> None:
+        """Fetch a provider's model list in the background."""
+
+        def worker() -> None:
+            try:
+                models: List[str] = list_models(provider)
+                error = None
+            except Exception as e:  # noqa: BLE001 - surfaced in the log below
+                models, error = [], str(e)
+            GLib.idle_add(cls._on_models_loaded, mode, provider, models, preferred, error)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    @classmethod
+    def _on_models_loaded(cls, mode: str, provider: str, models: List[str],
+                          preferred: str, error: Optional[str]) -> bool:
+        """Apply a fetched model list on the GTK main thread."""
+        if models:
+            cls._model_cache[provider] = models
+        else:
+            print(f"⚠️ Could not load {provider} models: {error}")
+        cls._apply_models(mode, provider, models, preferred)
+        return False  # run once
+
+    @classmethod
+    def _apply_models(cls, mode: str, provider: str, models: List[str], preferred: str) -> None:
+        """Populate a mode's model combo and keep the persisted choice in sync."""
+        provider_combo, model_combo = cls._model_combos.get(mode, (None, None))
+        if model_combo is None or provider_combo.get_active_id() != provider:
+            # Dialog closed or the user switched provider again meanwhile.
+            return
+
+        default_model = CFG.DEFAULT_MODELS.get(provider, "")
+        if not models:
+            # No catalog (offline / missing key): keep the configured model.
+            choices = [preferred]
+        elif preferred in models:
+            choices = list(models)
+        else:
+            choices = list(models)
+            preferred = default_model if default_model in models else models[0]
+
+        model_combo.remove_all()
+        for name in choices:
+            model_combo.append_text(name)
+        model_combo.set_sensitive(True)
+        model_combo.set_active(choices.index(preferred))
+
+        if getattr(STATE, f"{mode}_model") != preferred:
+            setattr(STATE, f"{mode}_model", preferred)
+            SettingsManager.save(STATE)
+
+    @classmethod
+    def _on_provider_changed(cls, combo: Gtk.ComboBoxText, mode: str) -> None:
+        """Handle provider selection change."""
+        provider = combo.get_active_id()
+        if not provider or provider == getattr(STATE, f"{mode}_provider"):
+            return
+
+        setattr(STATE, f"{mode}_provider", provider)
+        SettingsManager.save(STATE)
+        print(f"🔀 {mode} provider: {provider}")
+        cls._refresh_models(mode, provider, getattr(STATE, f"{mode}_model"))
+
+    @classmethod
+    def _on_model_changed(cls, combo: Gtk.ComboBoxText, mode: str) -> None:
+        """Handle model selection change."""
+        model = combo.get_active_text()
+        if not model or model == MODEL_LOADING_TEXT:
+            return
+        if getattr(STATE, f"{mode}_model") == model:
+            return
+
+        setattr(STATE, f"{mode}_model", model)
+        print(f"🧠 {mode} model: {model}")
+        SettingsManager.save(STATE)
 
     @staticmethod
     def _on_voice_changed(combo: Gtk.ComboBoxText) -> None:

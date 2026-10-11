@@ -122,7 +122,7 @@ class ModeHandler:
             "Output ONLY the finished text, without introduction or formatting."
         )
 
-        response = AIService.chat(prompt)
+        response = AIService.rewrite(prompt)
         if not response:
             return
 

@@ -15,6 +15,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 from linuxwhisper.config import CFG
 from linuxwhisper.handlers.keyboard import KeyboardHandler
+from linuxwhisper.state import STATE
 from linuxwhisper.ui.tray import TrayManager
 
 
@@ -24,8 +25,8 @@ def main() -> None:
 
     descriptions = {
         "dictation": "Live dictation at cursor position (Deepgram nova-3)",
-        "ai": "Empathic AI question (OpenRouter DeepSeek V4.1 Flash)",
-        "ai_rewrite": "Smart Rewrite - Highlight text & speak to edit",
+        "ai": f"Empathic AI question ({STATE.chat_provider} · {STATE.chat_model})",
+        "ai_rewrite": f"Smart Rewrite ({STATE.rewrite_provider} · {STATE.rewrite_model})",
         "vision": "Empathic Vision / Screenshot (Groq Qwen3.8)",
     }
 

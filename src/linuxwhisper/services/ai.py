@@ -23,13 +23,32 @@ class AIService:
         return messages
 
     @staticmethod
+    def _complete(messages: List[Dict[str, Any]], provider: str, model: str) -> str:
+        """Run one chat completion on the configured provider."""
+        if provider == "openrouter":
+            if OPENROUTER_CLIENT is None:
+                raise RuntimeError("OPENROUTER_API_KEY is not set — add it to ~/.bashrc")
+            return OPENROUTER_CLIENT.chat(model, messages)
+
+        if provider == "groq":
+            response = GROQ_CLIENT.chat.completions.create(model=model, messages=messages)
+            return response.choices[0].message.content
+
+        raise ValueError(f"unknown provider: {provider}")
+
+    @staticmethod
     @safe_execute("AI Chat")
     def chat(prompt: str) -> Optional[str]:
-        """Send chat completion request (OpenRouter)."""
-        if OPENROUTER_CLIENT is None:
-            raise RuntimeError("OPENROUTER_API_KEY is not set — add it to ~/.bashrc")
+        """Send chat completion request with the provider/model chosen for F4."""
         messages = AIService.build_messages(prompt)
-        return OPENROUTER_CLIENT.chat(CFG.MODEL_CHAT, messages)
+        return AIService._complete(messages, STATE.chat_provider, STATE.chat_model)
+
+    @staticmethod
+    @safe_execute("AI Rewrite")
+    def rewrite(prompt: str) -> Optional[str]:
+        """Send rewrite completion request with the provider/model chosen for F9."""
+        messages = AIService.build_messages(prompt)
+        return AIService._complete(messages, STATE.rewrite_provider, STATE.rewrite_model)
 
     @staticmethod
     @safe_execute("AI Vision")

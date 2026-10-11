@@ -54,6 +54,19 @@ class OpenRouterClient:
         return response.json()["choices"][0]["message"]["content"]
 
 
+def list_models(provider: str) -> List[str]:
+    """Return the model ids a provider currently offers."""
+    if provider == "openrouter":
+        response = httpx.get(f"{CFG.OPENROUTER_BASE_URL}/models", timeout=CFG.MODELS_TIMEOUT)
+        response.raise_for_status()
+        return sorted(model["id"] for model in response.json()["data"])
+
+    if provider == "groq":
+        return sorted(model.id for model in GROQ_CLIENT.models.list().data)
+
+    raise ValueError(f"unknown provider: {provider}")
+
+
 GROQ_CLIENT = _create_groq_client()
 
 # Only chat and rewrite use this one, so a missing key must not take down the app.
