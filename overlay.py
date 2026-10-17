@@ -1,9 +1,26 @@
-"""Isolated recording indicator: key edges only, never audio or release-path IPC."""
+"""Isolated recording indicator with best-effort, low-rate volume snapshots."""
+import math
 import os
 from pathlib import Path
 import select
+import socket
+import struct
 import subprocess
 import sys
+import time
+
+
+_AUDIO_TIME = struct.Struct("<d")
+
+
+def volume_level(pcm):
+    """Map mono PCM16 RMS to bar travel: quiet below -42 dBFS, full at -16."""
+    samples = memoryview(pcm).cast("h")
+    if not samples:
+        return 0.0
+    rms = math.sqrt(sum(sample * sample for sample in samples) / len(samples)) / 32768
+    decibels = 20 * math.log10(max(rms, 1 / 32768))
+    return max(0.0, min(1.0, (decibels + 42) / 26))
 
 
 class Overlay:
@@ -11,15 +28,23 @@ class Overlay:
 
     def __init__(self, devices, agent_enabled):
         self.process = None
+        self.audio_socket = None
+        self.next_audio = 0.0
         environment = {key: value for key, value in os.environ.items()
                        if key not in ("DEEPGRAM_API_KEY", "OPENROUTER_API_KEY")}
         command = [sys.executable, str(Path(__file__).resolve()),
-                   "agent" if agent_enabled else "dictation", *(device.path for device in devices)]
+                   "agent" if agent_enabled else "dictation"]
         try:
-            self.process = subprocess.Popen(
-                command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL, env=environment, start_new_session=True,
-            )
+            self.audio_socket, reader = socket.socketpair(
+                socket.AF_UNIX, socket.SOCK_DGRAM | socket.SOCK_NONBLOCK)
+            self.audio_socket.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 4096)
+            with reader:
+                self.process = subprocess.Popen(
+                    [*command, str(reader.fileno()), *(device.path for device in devices)],
+                    stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL, env=environment, start_new_session=True,
+                    pass_fds=(reader.fileno(),),
+                )
             if not select.select([self.process.stdout], [], [], 5)[0] or self.process.stdout.readline() != b"ready\n":
                 raise RuntimeError("Quickshell could not initialize; see README requirements")
             os.set_blocking(self.process.stdin.fileno(), False)
@@ -35,7 +60,20 @@ class Overlay:
             except (OSError, ValueError):
                 pass
 
+    def audio(self, data, adc):
+        # At most 20 snapshots/s; a full/dead observer drops visuals, never audio.
+        if self.audio_socket is None or adc < self.next_audio:
+            return
+        self.next_audio = adc + 0.05
+        try:
+            self.audio_socket.sendmsg([_AUDIO_TIME.pack(adc), data])
+        except OSError:
+            pass
+
     def close(self):
+        if self.audio_socket is not None:
+            self.audio_socket.close()
+            self.audio_socket = None
         if self.process is not None:
             self.process.stdin.close()
             self.process.stdout.close()
@@ -48,12 +86,10 @@ class Overlay:
             self.process = None
 
 
-def watch(agent_enabled, paths):
-    """Observe independent evdev readers; the main app arms each available take."""
+def watch(agent_enabled, audio_fd, paths):
+    """Observe key edges and evaluate volume outside the dictation process."""
     import selectors
     import signal
-    import socket
-    import struct
     import tempfile
 
     def terminate(*_):
@@ -64,7 +100,8 @@ def watch(agent_enabled, paths):
     devices = []
     visual = None
     with tempfile.TemporaryDirectory(prefix="linuxwhisper-", dir=os.environ["XDG_RUNTIME_DIR"]) as directory, \
-            socket.socket(socket.AF_UNIX) as server, selectors.DefaultSelector() as events:
+            socket.socket(socket.AF_UNIX) as server, selectors.DefaultSelector() as events, \
+            socket.socket(fileno=audio_fd) as audio_channel:
         path = str(Path(directory) / "overlay.sock")
         server.bind(path)
         server.listen(1)
@@ -85,9 +122,11 @@ def watch(agent_enabled, paths):
                 connection.setblocking(False)
                 events.register(connection, selectors.EVENT_READ, "visual")
                 events.register(sys.stdin.fileno(), selectors.EVENT_READ, "control")
+                events.register(audio_channel, selectors.EVENT_READ, "audio")
                 print("ready", flush=True)
                 armed = False
                 active = None
+                pressed = 0.0
                 while True:
                     for event, _ in events.select():
                         if event.data == "visual":
@@ -101,6 +140,15 @@ def watch(agent_enabled, paths):
                                 active = None
                                 armed = True
                                 connection.sendall(b"idle\n")
+                        elif event.data == "audio":
+                            snapshot = audio_channel.recv(4096)
+                            if active is None or len(snapshot) <= _AUDIO_TIME.size:
+                                continue
+                            adc, = _AUDIO_TIME.unpack_from(snapshot)
+                            if adc < pressed or not 0 <= time.monotonic() - adc <= 0.2:
+                                continue
+                            level = volume_level(memoryview(snapshot)[_AUDIO_TIME.size:])
+                            connection.sendall(f"level:{level:.3f}\n".encode("ascii"))
                         else:
                             try:
                                 data = os.read(event.fd, packet.size * 64)
@@ -124,6 +172,7 @@ def watch(agent_enabled, paths):
                                 if value == 1 and armed and active is None:
                                     armed = False
                                     active = code
+                                    pressed = time.monotonic()
                                     connection.sendall(b"f4\n" if code == 62 else b"alt\n")
                                 elif value == 0 and active == code:
                                     active = None
@@ -141,4 +190,4 @@ def watch(agent_enabled, paths):
 
 
 if __name__ == "__main__":
-    watch(sys.argv[1] == "agent", sys.argv[2:])
+    watch(sys.argv[1] == "agent", int(sys.argv[2]), sys.argv[3:])

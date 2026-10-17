@@ -11,6 +11,7 @@ from unittest.mock import patch
 from agent import Agent
 from bench import RATE, Take, capture_take, receive
 from evdev.ecodes import KEY_F4, KEY_RIGHTALT
+from overlay import volume_level
 
 
 class RecordingBoundaries(unittest.IsolatedAsyncioTestCase):
@@ -46,6 +47,24 @@ class RecordingBoundaries(unittest.IsolatedAsyncioTestCase):
                 await capture_take(ws, events, take, 80)
                 self.assertEqual(bytes(ws.audio), struct.pack('<10h', *range(3, 13)))
                 self.assertEqual(take.released, adc + 12.5 / RATE)
+
+
+class VolumeIndicator(unittest.TestCase):
+    def test_silence_and_background_noise_keep_bars_at_rest(self):
+        for samples in ((0,) * 160, (200, -200) * 80):
+            with self.subTest(samples=samples[:2]):
+                self.assertEqual(volume_level(struct.pack('<160h', *samples)), 0.0)
+
+    def test_volume_increases_with_signal_and_handles_signed_extremes(self):
+        def level(sample):
+            return volume_level(struct.pack('<160h', *([sample] * 160)))
+
+        self.assertLess(0.0, level(500))
+        self.assertLess(level(500), level(3000))
+        self.assertLess(level(3000), level(7000))
+        self.assertEqual(level(3000), level(-3000))
+        self.assertEqual(level(32767), 1.0)
+        self.assertEqual(level(-32768), 1.0)
 
 
 class TranscriptionErrors(unittest.IsolatedAsyncioTestCase):

@@ -61,12 +61,12 @@ async def finish_take(take, desktop, latency_log):
     print(f"Text delivered — Alt released → paste acknowledged: {elapsed_ms:.1f} ms", flush=True)
 
 
-async def agent_take(ws, events, take, chunk_ms, desktop, key):
+async def agent_take(ws, events, take, chunk_ms, desktop, key, overlay=None):
     # Both preparations run during recording, not after key release.
     selection = asyncio.create_task(desktop.selection())
     agent = Agent(key)
     try:
-        await capture_take(ws, events, take, chunk_ms)
+        await capture_take(ws, events, take, chunk_ms, overlay)
         instruction = " ".join(m["transcript"] for _, m in sorted(take.turns.items())).strip()
         if not instruction:
             print("No text; no agent request and nothing pasted.", flush=True)
@@ -95,7 +95,7 @@ async def receive(ws, take):
         raise RuntimeError("Deepgram closed before CloseStream; no complete result.")
 
 
-async def capture_take(ws, events, take, chunk_ms):
+async def capture_take(ws, events, take, chunk_ms, overlay=None):
     """Send clipped PCM in order, then drain the decoder (never ForceEndTurn)."""
     pending = bytearray()
     packet_bytes = RATE * chunk_ms // 1000 * 2
@@ -105,6 +105,8 @@ async def capture_take(ws, events, take, chunk_ms):
         nonlocal captured_until
         captured_until = max(captured_until, adc + len(data) / 2 / RATE)
         data, adc = clip(data, adc, take.pressed, take.released)
+        if overlay is not None and take.released is None and data:
+            overlay.audio(data, adc)
         pending.extend(data)
         while len(pending) >= packet_bytes:
             await ws.send(bytes(pending[:packet_bytes]))
@@ -244,11 +246,11 @@ async def main(args):
                             print("RECORDING …", flush=True)
                             if take.key == evdev.ecodes.KEY_F4:
                                 try:
-                                    await agent_take(ws, events, take, args.chunk_ms, desktop, agent_key)
+                                    await agent_take(ws, events, take, args.chunk_ms, desktop, agent_key, overlay)
                                 except (RuntimeError, OSError, TimeoutError, UnicodeError) as error:
                                     print(f"F4 failed: {error}", flush=True)
                             else:
-                                await capture_take(ws, events, take, args.chunk_ms)
+                                await capture_take(ws, events, take, args.chunk_ms, overlay)
                                 await finish_take(take, desktop, latency_log)
                             for warning in take.warnings:
                                 print("Deepgram warning:", warning.get("code", "unspecified"), flush=True)

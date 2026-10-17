@@ -6,12 +6,30 @@ import Quickshell.Wayland
 ShellRoot {
     id: root
     property string mode: "idle"
+    property real level: 0
+
+    Timer {
+        id: levelTimeout
+        interval: 180
+        onTriggered: root.level = 0
+    }
 
     Socket {
         path: Quickshell.env("LINUXWHISPER_OVERLAY_SOCKET")
         connected: true
         parser: SplitParser {
-            onRead: data => root.mode = data
+            onRead: data => {
+                if (data.startsWith("level:")) {
+                    if (root.mode !== "idle") {
+                        root.level = Number(data.slice(6))
+                        levelTimeout.restart()
+                    }
+                } else {
+                    root.mode = data
+                    root.level = 0
+                    levelTimeout.stop()
+                }
+            }
         }
         onConnectedChanged: if (!connected) Quickshell.quit()
     }
@@ -50,7 +68,14 @@ ShellRoot {
                     Rectangle {
                         required property int modelData
                         width: 2
-                        height: modelData
+                        height: modelData * (0.4 + 0.6 * root.level)
+                        Behavior on height {
+                            enabled: root.mode !== "idle"
+                            NumberAnimation {
+                                duration: 80
+                                easing.type: Easing.OutCubic
+                            }
+                        }
                         anchors.verticalCenter: parent.verticalCenter
                         radius: 1
                         color: "#eee6d6"

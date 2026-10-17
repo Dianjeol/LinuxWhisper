@@ -100,12 +100,14 @@ A few limits are worth knowing:
 
 ## The recording indicator
 
-While a recording key is held, a small charcoal capsule appears at the bottom center of Quickshell's default display. It has a static ivory sound mark, a warm recording dot, and a keycap:
+While a recording key is held, a small charcoal capsule appears at the bottom center of Quickshell's default display. Its five ivory bars respond smoothly to microphone volume, alongside a warm recording dot and a keycap:
 
 - **Listening / Release to paste** for AltGr dictation.
 - **Voice edit / Release to apply** for F4 editing.
 
 It disappears when you release the matching key, not when the network response arrives. It is visual feedback, not confirmation that the target application accepted the text. The surface is click-through, does not accept keyboard focus, and reserves no desktop space.
+
+Quiet input leaves the bars at rest; louder input makes them taller. This is a sampled volume indicator, not speech detection: typing, music, and other sufficiently loud sounds can move it too. A fixed -42 dBFS noise floor suppresses quiet background input. The display settles back to rest when samples stop arriving, and has no continuously looping animation.
 
 If you'd rather keep the screen clear, start with `./run --no-overlay`. If Quickshell cannot initialize, the app prints a startup warning and dictation remains available.
 
@@ -158,8 +160,8 @@ The main idea is to do useful work before you release the key: prepare the micro
 - [Reasoning is disabled](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens), and [provider routing prioritizes latency](https://openrouter.ai/docs/guides/routing/provider-selection#provider-sorting), not the lowest price. Long answers still need their full generation time.
 - AltGr makes no OpenRouter request and reads no text selection. The two paths remain separate.
 - There is exactly one paste: no artificial sleeps, character-by-character typing, or focus changes. Clipboard preparation and window classification run concurrently. Log writes and terminal output happen only after paste acknowledgment.
-- The optional overlay runs in separate observer/render processes, prepared before **READY**. It reads key edges independently, with no audio processing, polling timer, live waveform, transcript, microphone-level or elapsed-time display, continuous animation, additional microphone access, or per-frame messages from the dictation process. Neither visual process receives the API keys, and both exit with the app.
-- The main process only arms the overlay before each **READY** and never waits for the renderer during recording or finalization. There is no overlay hook between key release and paste acknowledgment. Additional key presses during finalization are ignored by the indicator until the app is ready again.
+- The optional overlay runs in separate observer/render processes, prepared before **READY**, and reads key edges independently. While recording, the main process makes at most 20 nonblocking sends per second of short PCM snapshots from the existing microphone stream. A bounded private local datagram socket drops visual updates if its observer is stalled; transcription audio is unchanged. Only the observer computes volume, and only scalar levels reach QML. No VAD, second microphone stream, new dependency, additional network request, or audio file is involved. Neither visual process receives API keys, and both exit with the app.
+- The main process arms the overlay before each **READY** and never waits for the renderer during recording or finalization. It stops offering snapshots once it processes the matching release. The observer hides the surface independently on key-up; decoder finalization and paste never wait for a visual acknowledgment or animation. Additional key presses during finalization are ignored by the indicator until the app is ready again.
 - An overlay still uses memory and compositor resources. Process isolation does not prove literally zero overhead or freedom from latency regressions.
 
 </details>
@@ -199,6 +201,25 @@ The documented Python installation was checked in a fresh, isolated virtual envi
 
 All application modules imported successfully in that environment. The CLI help, the documented audio-device listing, and `bash -n run` also passed. The required system packages and desktop commands were confirmed present; the `pacman` installation was not rerun. This documentation-only update did not change the app's behavior or repeat the dictation/latency checks below.
 
+
+### Volume-reactive recording indicator
+
+- Visually checked the actual Hyprland/Quickshell AltGr and F4 surfaces with quiet, soft, and loud PCM snapshots through the production observer. Bar height followed volume and returned to rest after updates stopped. Synthetic FIFO key events checked unrelated-key release, matching release, finalization lockout, and unchanged focus.
+- Stopped the real observer and filled its datagram channel. The recording path still delivered the exact sample-clipped PCM, including both fractional key boundaries, and completed `CloseStream`; the visual queue did not block or truncate the recording.
+- Confirmed complete transcriptions in a native Chromium text field through the production paste path. Existing text was preserved and every inserted text ended with the final spoken words. With the caret placed between a prefix and a suffix, one replay inserted the transcription at exactly that caret (`PREFIX ` + text + ` SUFFIX`).
+- Restarted the real `./run` instance afterwards with the real microphone and a real EU Deepgram WebSocket. It reached **READY** with the volume-reactive observer and its renderer running.
+- `.venv/bin/python -m unittest -v test_flow`: eight passing regression tests, including silence/background-noise suppression, increasing volume, and both signed PCM extremes. `./run --help` and `bash -n run` passed.
+
+Five real-time replays per group used the same public English speech sample, 80 ms packets, real EU Deepgram with MIP opt-out, full `CloseStream` finalization, Hyprland paste acknowledgment, and the same replay harness in both groups:
+
+| Alt released → paste acknowledged | Static bars | Volume-reactive bars |
+| --- | ---: | ---: |
+| Median | 193.9 ms | 221.9 ms |
+| p95 (nearest rank, n=5) | 904.2 ms | 647.1 ms |
+
+The groups differ in both directions and overlap heavily; the spread reflects network and desktop variability, not the indicator. Five samples establish neither a speedup nor freedom from regressions. The added work during a recording is at most 20 nonblocking datagram sends per second on a local socket, and none after the matching release.
+
+- These desktop checks used injected PCM/key events, not physical speech or physical AltGr/F4 presses. A controlled real-microphone before/after comparison remains outstanding; process isolation and bounded visual updates are not proof of zero latency overhead.
 
 ### Recording overlay and privacy update
 
