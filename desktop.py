@@ -31,6 +31,30 @@ class Desktop:
     async def check(self):
         await self.request("j/activewindow")
 
+    async def selection(self):
+        """Snapshot PRIMARY during F4 recording; never overwrite the clipboard."""
+        wl_paste = shutil.which("wl-paste")
+        if not wl_paste:
+            raise RuntimeError("F4 benötigt wl-paste aus wl-clipboard.")
+        process = await asyncio.create_subprocess_exec(
+            wl_paste, "--primary", "--no-newline", "--type", "text",
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+        )
+        try:
+            async with asyncio.timeout(3):
+                active, (text, _) = await asyncio.gather(
+                    self.request("j/activewindow"), process.communicate())
+        finally:
+            if process.returncode is None:
+                process.kill()
+            await process.wait()
+        if process.returncode or not text.strip():
+            raise RuntimeError("Keine Textauswahl verfügbar; Text markieren und F4 erneut halten.")
+        target = json.loads(active).get("address")
+        if not target:
+            raise RuntimeError("F4 benötigt ein fokussiertes Anwendungsfenster.")
+        return text.decode("utf-8"), target
+
     async def copy(self, text):
         # wl-copy's parent exits only after its child owns the selection. Unlike
         # --paste-once, the owner also survives the clipboard-history reader.
@@ -53,11 +77,13 @@ class Desktop:
         if process.returncode:
             raise RuntimeError(f"Clipboard-Übergabe fehlgeschlagen (wl-copy: {process.returncode}).")
 
-    async def paste(self, text):
+    async def paste(self, text, target=None):
         # Clipboard setup and window classification are independent. Omarchy's
         # terminal tag is the source of truth, not a second list of app names.
         active, _ = await asyncio.gather(self.request("j/activewindow"), self.copy(text))
         window = json.loads(active)
+        if target is not None and window.get("address") != target:
+            raise RuntimeError("Fokus gewechselt; Antwort nur im Clipboard, nicht eingefügt.")
         terminal = any(tag.rstrip("*") == "terminal" for tag in window.get("tags", []))
         mods, key = ("SHIFT", "Insert") if terminal else ("CTRL", "V")
         # No window argument: reach the focused surface, including layer shells.
