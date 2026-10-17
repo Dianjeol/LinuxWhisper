@@ -1,28 +1,34 @@
-# LinuxWhisper — complete text at your cursor, as fast as possible
+# LinuxWhisper
 
-**Performance is this app's primary goal:** after releasing the recording key, the complete text should appear at the cursor with as little waiting as possible. Truncating text is not an optimization.
+Speak instead of typing, or ask for a small change to text you've already written. LinuxWhisper is a lightweight dictation app for **Omarchy with Hyprland/Wayland**. It pastes the result into the text field you have focused, so you can stay in the application you're using.
 
-- **Hold right Alt/AltGr, speak, release:** dictate directly.
-- **Select text, hold F4, speak an instruction, release:** the agent's answer replaces the selection in the text field and is available in the clipboard and Omarchy's existing clipboard history.
+There are two ways to use it:
 
-Both paths use Deepgram Flux Multilingual, with German as the intentional default speech language, at the EU endpoint. F4 additionally uses [DeepSeek V4.1 Flash via OpenRouter](https://openrouter.ai/deepseek/deepseek-v4.1-flash), exactly `deepseek/deepseek-v4.1-flash`. Despite the app's name, it does not use a local Whisper model.
+- **Dictate:** hold right Alt/AltGr, speak, then release. Your words are transcribed and pasted at the cursor.
+- **Edit by voice:** select some text, hold F4, and say what you'd like to change. The completed answer replaces your selection. This optional feature needs an OpenRouter API key.
 
-## Performance first
+**Performance comes first:** the goal is to keep the pause between releasing the key and receiving the complete text as short as possible. That means preparing ahead and streaming while you speak—not cutting off the last word or pasting an unfinished result.
 
-- The microphone and Deepgram WebSocket are open before **READY**. Audio streams while the key is held, not only afterward.
-- `CloseStream` processes the remaining audio and the final word. No `ForceEndTurn`, artificial response limit, or insertion of unfinished partial results.
-- F4 reads the selection and establishes DNS/TCP/TLS to OpenRouter during recording. Exactly one model request follows the complete transcript; no warm-up HTTP request.
-- [Reasoning is disabled](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens); [provider routing prioritizes latency](https://openrouter.ai/docs/guides/routing/provider-selection#provider-sorting), not the lowest price. Long answers still take their full generation time.
-- AltGr makes no OpenRouter request and reads no text selection. The agent path remains separate.
-- Exactly one paste, no sleeps, no character-by-character typing, no focus changes. Clipboard preparation and window classification still run concurrently; no log writes before paste acknowledgment.
-- The optional recording overlay runs in separate observer/render processes, prepared before **READY**. It reads key edges independently: no audio processing, polling timer, live waveform, or per-frame messages from the dictation process. There is no overlay hook between key release and paste acknowledgment.
-- An overlay still consumes memory and compositor resources. Process isolation is not a promise of literally zero overhead or measured freedom from latency regressions.
+A small recording indicator shows when you're holding a recording key. The inserted text is also available in Omarchy's existing clipboard history.
 
-## Setup
+## Before you begin
 
-Requirements: Omarchy with Hyprland/Wayland, Python ≥ 3.11, a microphone, Omarchy's clipboard capture running, and read access to keyboard devices under `/dev/input/event*`. The recording indicator uses Quickshell, already included in Omarchy. These permissions allow keyboard input to be read; do not run the app with `sudo`.
+You'll need:
 
-In the project directory:
+- **Omarchy with Hyprland/Wayland**, a microphone, and an internet connection. This is not a general-purpose app for every Linux desktop.
+- A **Deepgram account and API key** for speech recognition. An API key is the secret credential that lets the app use your account. New accounts receive initial API credit when [signing up](https://console.deepgram.com/signup); after that, [usage pricing](https://deepgram.com/pricing) applies.
+- Optionally, an **[OpenRouter API key](https://openrouter.ai/settings/keys)** if you'd like to edit selected text with F4. Dictation works without it.
+- Read access to keyboard devices under `/dev/input/event*`, and Omarchy's clipboard capture running. Keyboard-reading permissions are sensitive: they allow keyboard input to be read. Please don't run the app with `sudo` to work around a permission error. The installation commands below do not grant those permissions.
+
+**This is a cloud-based app, not a local Whisper model.** Recorded speech goes to Deepgram. F4 also sends your selected text and spoken instruction to OpenRouter and its model provider. Deepgram is configured for EU-only processing; OpenRouter is not restricted to the EU. The [privacy section](#privacy-and-your-data) explains retention controls and their limits.
+
+German is the default speech language. You can choose another language with `--language`, as shown [below](#useful-options).
+
+## Get started
+
+### 1. Install the app's dependencies
+
+Open a terminal in this project folder and run:
 
 ```bash
 sudo pacman -S --needed python python-pip base-devel linux-api-headers portaudio wl-clipboard quickshell
@@ -30,7 +36,13 @@ python -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
-New accounts receive free initial API credit when [signing up for Deepgram](https://console.deepgram.com/signup). After that, [usage pricing](https://deepgram.com/pricing) applies. Create an API key there and set it in Bash for the current session without saving it in shell history:
+The first command installs system packages; it may ask for your password. The next two create a separate Python environment for this project and install its Python packages. Python 3.11 or newer is required. You don't need to activate the environment manually: the `run` launcher uses it for you.
+
+`requirements.txt` contains the three direct Python dependencies: `evdev` for keyboard events, `sounddevice` for microphone capture, and `websockets` for the Deepgram connection. Their own Python dependencies are installed automatically. PortAudio, `wl-clipboard`, and Quickshell are system packages, not pip packages. Quickshell provides the recording indicator and is already included in Omarchy. The OpenRouter client uses Python's standard library; no separate model SDK is needed.
+
+### 2. Add your Deepgram key and start
+
+In the same Bash terminal, run:
 
 ```bash
 read -rsp 'Deepgram API key: ' DEEPGRAM_API_KEY; echo
@@ -38,9 +50,21 @@ export DEEPGRAM_API_KEY
 ./run
 ```
 
-`./run` uses `DEEPGRAM_API_KEY` and, for F4, also `OPENROUTER_API_KEY`. If either value is missing from the environment, the launcher loads an interactive Bash with `~/.bashrc`. Export the keys there. No `.env` file is loaded. AltGr still works without an OpenRouter key; F4 reports the missing key. Never commit API keys.
+Paste your key at the prompt and press Enter. It won't be displayed or saved in your shell history. Keep the key private; don't commit it to GitHub.
 
-Create an OpenRouter key: [OpenRouter Keys](https://openrouter.ai/settings/keys). For the current Bash session:
+Wait until the terminal shows **READY**. The microphone and speech-recognition connection are prepared at that point. Keep the app running in this terminal; **Ctrl+C** stops it. Please run only one instance at a time.
+
+### 3. Try your first dictation
+
+1. Click into an editable text field in the application you want to use.
+2. Hold **right Alt/AltGr** and say a short sentence.
+3. Release the key, keeping the intended text field focused while the app finishes.
+
+The complete transcription is pasted at your current cursor position. To find it again in Omarchy's clipboard history, press **Super+Ctrl+V**.
+
+### Optional: enable voice editing
+
+If you'd like to use F4, stop the app with **Ctrl+C**, then add your OpenRouter key in the same terminal and start again:
 
 ```bash
 read -rsp 'OpenRouter API key: ' OPENROUTER_API_KEY; echo
@@ -48,85 +72,133 @@ export OPENROUTER_API_KEY
 ./run
 ```
 
-## Usage
+Your Deepgram key must still be available in that terminal. For maximum privacy, also check the OpenRouter account settings described [below](#openrouter-account-settings).
 
-Wait for **READY**, focus a text field, and dictate. The microphone and connection are then prepared. **Ctrl+C** exits; run only one instance at a time. The app itself does not configure bindings, autostarts, or services.
+<details>
+<summary>Using API keys in later sessions</summary>
 
-- AltGr and F4 remain visible to other apps; existing app shortcuts may react. AltGr key combinations also start recording. Left Alt does not. During a recording, only releasing its own key ends it.
-- Text is pasted once: `Ctrl+V` in apps, `Shift+Insert` in windows with Omarchy's `terminal` tag. No additional Enter, no focus changes.
-- Stay in the intended text field while processing finishes. Locked surfaces and alternative paste shortcuts are not universally supported; terminals handle newlines according to their configuration.
-- Open clipboard history: **Super+Ctrl+V**. The app uses the existing Omarchy watcher, not its own history.
+The commands above set keys for the current terminal session. For later sessions or autostart, export `DEEPGRAM_API_KEY` and, if needed, `OPENROUTER_API_KEY` from your Bash configuration (`~/.bashrc`) or make them available in the environment.
+
+If either key is missing from the environment, `./run` loads an interactive Bash with `~/.bashrc` before starting the app. A missing OpenRouter key disables F4, not AltGr dictation. A `.env` file is not loaded.
+
+</details>
+
+## Editing selected text with F4
+
+1. **Make a fresh selection** in the text field you want to edit.
+2. **Hold F4** and speak an instruction—for example, “Schreibe diesen Text bitte freundlicher” (“Please make this text friendlier”).
+3. **Release F4** and leave the window, cursor, and selection unchanged until the answer arrives.
+
+The app sends the selected text and your spoken instruction together, then inserts only the complete result, without an extra introduction. Each request is independent; there is no chat history. F4 uses [DeepSeek V4.1 Flash through OpenRouter](https://openrouter.ai/deepseek/deepseek-v4.1-flash), exactly `deepseek/deepseek-v4.1-flash`. Both recording modes use Deepgram Flux Multilingual for speech recognition.
+
+A few limits are worth knowing:
+
+- The target application needs to share its text selection through Wayland's **PRIMARY** selection (`wl-paste --primary`). A native Chromium text field has been checked. This reads the selection without a copy shortcut or changes to the regular clipboard. PRIMARY is shared across the desktop and can contain an old selection from another window, so making a fresh selection in the intended field matters. Apps without PRIMARY support aren't suitable for this F4 workflow.
+- An empty or unreadable selection, silence, an API error, or an incomplete model answer results in no paste. No model request is made without a spoken instruction, although connection preparation may already have taken place.
+- If the app detects that you've switched windows, it leaves the completed answer in the clipboard instead of pasting it. Moving the cursor or changing the selection within the same window is not detected. The focus check also cannot prevent a later focus change between checking and pasting.
+- In a terminal, an answer is pasted at the input cursor; it does not rewrite selected terminal output. Newlines can execute commands there, depending on the terminal's configuration. Please don't generate executable content without reviewing it.
+
+## The recording indicator
+
+While a recording key is held, a small charcoal capsule appears at the bottom center of Quickshell's default display. It has a static ivory sound mark, a warm recording dot, and a keycap:
+
+- **Listening / Release to paste** for AltGr dictation.
+- **Voice edit / Release to apply** for F4 editing.
+
+It disappears when you release the matching key, not when the network response arrives. It is visual feedback, not confirmation that the target application accepted the text. The surface is click-through, does not accept keyboard focus, and reserves no desktop space.
+
+If you'd rather keep the screen clear, start with `./run --no-overlay`. If Quickshell cannot initialize, the app prints a startup warning and dictation remains available.
+
+## Useful options
 
 ```bash
-./run --once                 # One AltGr or F4 recording, then exit
-./run --no-overlay           # Dictation without the visual indicator
-./run --help                 # All options, including language and log path
-.venv/bin/python -m sounddevice  # List audio devices
+./run --language en             # English speech hints instead of the default German
+./run --once                    # One AltGr or F4 recording, then exit
+./run --no-overlay              # Run without the recording indicator
+./run --help                    # All options, including language and log path
+.venv/bin/python -m sounddevice  # List available audio devices
 ```
 
-### Recording indicator
+### Working with other applications
 
-A small charcoal capsule appears at the bottom center of Quickshell's default display while AltGr or F4 is held: a static ivory sound mark, warm recording dot, and a keycap. **Listening / Release to paste** identifies dictation; **Voice edit / Release to apply** identifies F4. It disappears on the matching key release, not after the network response.
+The app pastes once using `Ctrl+V`, or `Shift+Insert` in windows with Omarchy's `terminal` tag. It doesn't press Enter or switch focus. Applications with different paste shortcuts, locked surfaces, and non-editable areas aren't universally supported; a surface that cannot accept text isn't an input field.
 
-The surface is click-through, never accepts keyboard focus, and reserves no desktop space. No transcript, microphone level, elapsed-time display, continuous animation, or additional microphone access. Both visual processes start before **READY**, receive neither API key, and exit with the app. The main process only arms the indicator before each **READY**; it never waits for the renderer during recording or finalization. Additional presses while a take is being finalized are ignored by the indicator until the app is ready again.
+AltGr and F4 are still visible to other applications, so existing shortcuts may react. AltGr key combinations also start recording; left Alt does not. During a recording, only releasing its own recording key ends it. The app itself does not set up keyboard bindings, autostarts, or services.
 
-Use `--no-overlay` to disable it. If Quickshell cannot initialize, the app prints a startup warning and dictation remains available. The indicator is feedback, not confirmation that a target application accepted text.
+## Privacy and your data
 
+The microphone stays open while the app runs, but audio outside a held recording key is discarded locally. Audio recorded while AltGr or F4 is held is sent to Deepgram; the app does not save it as an audio file. F4 additionally sends the text selection and the complete instruction transcript to OpenRouter and its model provider. Please don't select confidential text that must not go to those services.
 
-### F4: edit selected text by voice
+A successful paste replaces the clipboard, and the text remains in the existing local Omarchy clipboard history. The app does not create its own history or save transcripts, selections, or answers to files. Remote retention settings do not disable your desktop's clipboard history. The model prompt is not a guarantee of protection against manipulative content in a selection.
 
-1. **Make a fresh selection** of the desired text in the target window.
-2. **Hold F4** and say, for example, “Schreibe diesen Text bitte freundlicher” (“Please make this text friendlier”).
-3. **Release F4**; leave the window, cursor, and selection unchanged until the answer arrives.
+### Service-side retention controls
 
-The spoken instruction and the selection read at the start of recording are sent together to OpenRouter. Only the complete result is inserted, without an additional agent introduction. Each recording is independent; there is no chat history.
+- **Deepgram: EU-only processing and zero content retention.** Every Flux WebSocket uses `api.eu.deepgram.com` with `mip_opt_out=true`. There is no US/global endpoint option or automatic geographic fallback. According to [Deepgram's data policy](https://developers.deepgram.com/trust-security/your-data), this combination keeps processing in the EU, excludes model improvement, and retains audio/transcripts only for the duration needed to process the request. Request metadata and usage logs still remain; this does not mean zero retained records.
+- **OpenRouter: Zero Data Retention (ZDR) and no provider data collection, with global routing.** Every F4 request sets `provider.zdr=true`, `provider.data_collection="deny"`, and `provider.require_parameters=true`. Latency-first routing and disabled reasoning are retained. Failover can only choose endpoints eligible under those privacy constraints; a rejected request is not retried with weaker settings or a different model. **EU residency is not enforced for OpenRouter.**
+- [OpenRouter's ZDR policy](https://openrouter.ai/docs/guides/features/zdr) allows implicit in-memory prompt caching. There is no documented DeepSeek request parameter to disable that cache. ZDR does not mean that temporary processing or memory use is avoided.
 
-The selection is read through Wayland's **PRIMARY** (`wl-paste --primary`), without a copy shortcut or changes to the regular clipboard. The application must provide this text selection; a native Chromium text field was among the cases checked. PRIMARY is system-wide: it cannot identify a stale selection from another window. Always make a fresh selection in the target window; apps without PRIMARY support are unsuitable for this F4 path.
+### OpenRouter account settings
 
-An empty/unreadable selection, silence, API errors, or an incomplete model answer result in no paste. No model request is made without a spoken instruction. TLS preparation may already have taken place. If a change in the focused window is detected, the completed answer remains only in the clipboard. Cursor/selection changes within the same window are not detected; the focus check is not an atomic lock against later focus changes.
+For the strongest privacy available with this setup, keep prompt/completion logging and data-sharing opt-ins disabled in your OpenRouter account or workspace, and remove Broadcast/observability destinations.
 
-In a terminal, the answer is inserted at the input cursor; it does not rewrite selected terminal output. Newlines can execute commands there — do not generate executable content without reviewing it.
+Request parameters do not override [input/output logging](https://openrouter.ai/docs/guides/features/input-output-logging) or [Broadcast destinations](https://openrouter.ai/docs/guides/features/broadcast). This app does not change or verify those account settings. OpenRouter's own ZDR policy excludes prompts only when you have not opted into logging; operational and billing metadata are separate.
 
-### Optional autostart
+Further references: [Deepgram MIP opt-out](https://developers.deepgram.com/docs/the-deepgram-model-improvement-partnership-program), [OpenRouter provider controls](https://openrouter.ai/docs/guides/routing/provider-selection), and [OpenRouter regional routing boundaries](https://openrouter.ai/docs/guides/features/in-region-routing).
 
-For a checkout at `~/Work/LinuxWhisper`, add this to `~/.config/hypr/autostart.lua`:
+## How the app keeps the wait short
 
-```lua
-o.launch_on_start(os.getenv("HOME") .. "/Work/LinuxWhisper/run")
-```
+The main idea is to do useful work before you release the key: prepare the microphone and connection, send audio while you're speaking, then finish decoding and paste the complete text once.
 
-Adjust the project path if needed. API keys must remain available in the environment or through `~/.bashrc`. The app starts in the background at the next Hyprland session start, not on a configuration reload.
+<details>
+<summary>Technical performance details</summary>
 
-## Data and latency
+- The microphone and Deepgram WebSocket are open before **READY**. Audio streams while the recording key is held, not only afterward.
+- `CloseStream` processes the remaining audio and the final word. There is no `ForceEndTurn`, artificial response limit, or insertion of unfinished partial results.
+- During F4 recording, the app reads the selection and establishes DNS/TCP/TLS to OpenRouter. Exactly one model request follows the complete transcript; there is no warm-up HTTP request.
+- [Reasoning is disabled](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens), and [provider routing prioritizes latency](https://openrouter.ai/docs/guides/routing/provider-selection#provider-sorting), not the lowest price. Long answers still need their full generation time.
+- AltGr makes no OpenRouter request and reads no text selection. The two paths remain separate.
+- There is exactly one paste: no artificial sleeps, character-by-character typing, or focus changes. Clipboard preparation and window classification run concurrently. Log writes and terminal output happen only after paste acknowledgment.
+- The optional overlay runs in separate observer/render processes, prepared before **READY**. It reads key edges independently, with no audio processing, polling timer, live waveform, transcript, microphone-level or elapsed-time display, continuous animation, additional microphone access, or per-frame messages from the dictation process. Neither visual process receives the API keys, and both exit with the app.
+- The main process only arms the overlay before each **READY** and never waits for the renderer during recording or finalization. There is no overlay hook between key release and paste acknowledgment. Additional key presses during finalization are ignored by the indicator until the app is ready again.
+- An overlay still uses memory and compositor resources. Process isolation does not prove literally zero overhead or freedom from latency regressions.
 
-The microphone remains open; audio outside the held-key interval is discarded locally. While AltGr or F4 is held, audio is transmitted to Deepgram, but the app does not save it to a file. **F4 additionally sends the text selection and the complete instruction transcript to OpenRouter and its model provider.** Deepgram's EU endpoint does not guarantee EU processing at OpenRouter. Do not select confidential text that must not be sent to these providers.
+</details>
 
-The inserted text replaces the clipboard and remains in the local Omarchy clipboard history. The app writes no history of its own and saves no transcripts, selections, or answers to files. The prompt is not a guarantee of protection against manipulative content in the selection.
+### What the latency log measures
 
-### Remote privacy policy
-
-- **Deepgram: EU-only and zero content retention.** Every Flux WebSocket uses `api.eu.deepgram.com` with `mip_opt_out=true`. There is no US/global endpoint option or automatic geographic fallback. According to [Deepgram's data policy](https://developers.deepgram.com/trust-security/your-data), this combination keeps processing in the EU, excludes model improvement, and retains audio/transcripts only for the duration needed to process the request. Request metadata and usage logs remain; this is not zero retained records.
-- **OpenRouter: ZDR-only, no provider data collection; global routing.** Every F4 request sets `provider.zdr=true`, `provider.data_collection="deny"`, and `provider.require_parameters=true`, while retaining latency-first routing and disabled reasoning. Failover can only select endpoints eligible under those privacy constraints. A rejected request is not retried with weaker settings or a different model. The existing DeepSeek model remains unchanged. **EU residency is not enforced for OpenRouter**, as explicitly selected for this setup.
-- [OpenRouter ZDR](https://openrouter.ai/docs/guides/features/zdr) permits implicit in-memory prompt caching. There is no documented DeepSeek request parameter to disable that cache; do not interpret ZDR as “no temporary processing or memory.”
-- Request parameters do not override account/workspace [input/output logging](https://openrouter.ai/docs/guides/features/input-output-logging) or [Broadcast destinations](https://openrouter.ai/docs/guides/features/broadcast). **Keep prompt/completion logging and data-sharing opt-ins disabled, and remove Broadcast/observability destinations** in your OpenRouter account/workspace for maximum privacy. This repository does not change account settings and cannot certify them. OpenRouter's own ZDR policy excludes prompts only when you have not opted into logging; operational/billing metadata is separate.
-- The local clipboard history intentionally retains pasted text. Remote content-retention controls do not disable that existing desktop feature.
-
-References: [Deepgram MIP opt-out](https://developers.deepgram.com/docs/the-deepgram-model-improvement-partnership-program), [OpenRouter provider controls](https://openrouter.ai/docs/guides/routing/provider-selection), and [OpenRouter regional routing boundaries](https://openrouter.ai/docs/guides/features/in-region-routing).
-
-
-For each successful, nonempty **AltGr dictation**, one number in milliseconds is written to:
+For each successful, nonempty **AltGr dictation**, one value in milliseconds is written to:
 
 ```text
 ${XDG_STATE_HOME:-$HOME/.local/state}/sound/latency.log
 ```
 
-The measurement is **Alt released → paste command acknowledged by Hyprland**: it includes the remaining audio, complete decoder finalization with `CloseStream`, and clipboard handoff. It confirms neither processing nor visible rendering by the target application; subsequent history storage is also outside the measurement.
+The measurement is **Alt released → paste command acknowledged by Hyprland**. It includes the remaining audio, complete decoder finalization with `CloseStream`, and clipboard handoff. It does not confirm when the target application processes or visibly renders the text; later clipboard-history storage is also outside the measurement.
 
-Log writes and terminal output occur only afterward. The log contains no audio, transcripts, or API keys. Silence and failed handoffs produce no successful value; a later log error can occur even after text has been pasted. Development rules: [AGENTS.md](AGENTS.md).
+The log contains no audio, transcripts, or API keys. Silence and failed handoffs produce no successful value. A log error can still occur after text has already been pasted. F4 values are not mixed into this AltGr log: generating the complete model answer is part of F4's actual waiting time and is not hidden by moving the measurement boundary.
 
-F4 values are not mixed into this AltGr log. The agent's additional model generation is part of the actual wait for complete insertion; it is not hidden by moving the measurement boundary earlier.
+## Optional autostart
+
+If you'd like the app to start when you sign in, and your checkout is at `~/Work/LinuxWhisper`, add this to `~/.config/hypr/autostart.lua`:
+
+```lua
+o.launch_on_start(os.getenv("HOME") .. "/Work/LinuxWhisper/run")
+```
+
+Adjust the path if your project is elsewhere. The API keys need to be available in the environment or through `~/.bashrc`. The app starts in the background at the next Hyprland session start, not when the configuration is reloaded. This is optional; the app does not make the change for you.
 
 ## Verification status
+
+<details>
+<summary>Installation checks, desktop checks, and latency measurements</summary>
+
+These notes distinguish what has been checked from what still needs a real-world comparison. Development rules are in [AGENTS.md](AGENTS.md).
+
+### Setup and dependency check
+
+The documented Python installation was checked in a fresh, isolated virtual environment on Python 3.14.7. Installing only `requirements.txt` brought in all three direct dependencies, plus the automatically resolved `cffi` and `pycparser` dependencies. `pip check` reported no broken requirements.
+
+All application modules imported successfully in that environment. The CLI help, the documented audio-device listing, and `bash -n run` also passed. The required system packages and desktop commands were confirmed present; the `pacman` installation was not rerun. This documentation-only update did not change the app's behavior or repeat the dictation/latency checks below.
+
 
 ### Recording overlay and privacy update
 
@@ -146,8 +218,8 @@ Five real-time replays per group used the same public English speech sample, 80 
 
 These are synthetic key/audio replays, not physical dictations. Desktop activity and network variability were not controlled; five samples do not establish either a speedup or freedom from regressions. A controlled microphone before/after comparison remains outstanding. No claim of literally zero overhead.
 
-### Earlier F4 checks
-
+<details>
+<summary>Earlier F4 checks</summary>
 
 - Started through `./run --once` with a real microphone and real Deepgram WebSocket through **READY**; checked `./run --help` and `bash -n run`.
 - Streamed a German test speech recording in real time to the actual Deepgram EU endpoint, followed by a real request to the OpenRouter model named above. The recording contained “Schreibe diesen Text bitte freundlicher.”
@@ -157,9 +229,13 @@ These are synthetic key/audio replays, not physical dictations. Desktop activity
 - Ran three Deepgram speech replays before and three after the change, each with the complete final word; executed AltGr finalization and paste acknowledgment. These are not physical dictations or reliable evidence of a speedup or freedom from regressions. A controlled before/after microphone comparison with median/p95 is still missing.
 - `.venv/bin/python -m unittest -v test_flow`: four passing regression tests covering sample-accurate AltGr/F4 boundaries despite releasing the other key, Unicode/formatting, interrupted/empty answers, and confidential error responses.
 
-Physical AltGr/F4 key presses and a fresh session start were not checked automatically. In the existing environment, `pip check` reports an unrelated missing `systemd-python` dependency for `proton-vpn-daemon`; the app introduces no new dependency.
+Physical AltGr/F4 key presses and a fresh session start were not checked automatically. In the existing environment, `pip check` reported an unrelated missing `systemd-python` dependency for `proton-vpn-daemon`; the F4 update introduced no new dependency.
 
-Previously documented: autostart launch path through `uwsm-app` through **READY**, including without an inherited API key; `hyprctl reload` and `hyprctl configerrors` without errors. No Hyprland bindings, autostarts, or services were configured, and no configuration files were changed for F4.
+Previously documented: the autostart launch path through `uwsm-app` through **READY**, including without an inherited API key; `hyprctl reload` and `hyprctl configerrors` without errors. No Hyprland bindings, autostarts, or services were configured, and no configuration files were changed for F4.
+
+</details>
+
+</details>
 
 ## License
 
