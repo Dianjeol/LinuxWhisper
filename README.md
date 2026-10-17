@@ -22,7 +22,7 @@ You'll need:
 
 **This is a cloud-based app, not a local Whisper model.** Recorded speech goes to Deepgram. F4 also sends your selected text and spoken instruction to OpenRouter and its model provider. Deepgram is configured for EU-only processing; OpenRouter is not restricted to the EU. The [privacy section](#privacy-and-your-data) explains retention controls and their limits.
 
-German and English are the default speech hints: each Flux connection sends `language_hint=de` and `language_hint=en`. A German-only hint returned empty results for short English phrases. `--language` is repeatable if you want a different set, and `--language auto` sends no hint at all so Flux detects the spoken language itself, as shown [below](#useful-options).
+Flux detects the spoken language itself: no `language_hint` is sent by default, so German, English, and the other supported languages work without switching anything. `--language` is repeatable if you'd rather bias Flux toward languages you know you speak, as shown [below](#useful-options); a German-only hint returned empty results for short English phrases.
 
 ## Get started
 
@@ -114,13 +114,14 @@ If you'd rather keep the screen clear, start with `./run --no-overlay`. If Quick
 ## Useful options
 
 ```bash
-./run --language de             # German-only speech hints (default: de and en)
-./run --language en             # English-only speech hints
-./run --language auto           # Send no hint; Deepgram detects the spoken language
-./run --once                    # One AltGr or F4 recording, then exit
-./run --no-overlay              # Run without the recording indicator
-./run --help                    # All options, including language and log path
-.venv/bin/python -m sounddevice  # List available audio devices
+./run --language auto              # Default: no hint; Deepgram detects the language
+./run --language de                # Bias toward German speech
+./run --language en                # Bias toward English speech
+./run --language de --language en  # Bias toward German and English
+./run --once                       # One AltGr or F4 recording, then exit
+./run --no-overlay                 # Run without the recording indicator
+./run --help                       # All options, including language and log path
+.venv/bin/python -m sounddevice    # List available audio devices
 ```
 
 ### Working with other applications
@@ -225,7 +226,7 @@ The groups differ in both directions and overlap heavily; the spread reflects ne
 
 ### Recording overlay and privacy update
 
-- Started the updated `./run` with the real microphone, actual keyboard device, Quickshell, and real EU Deepgram WebSocket through **READY**. The speech hint then in use was German-only (since changed to `de` and `en`; see [Speech language hints](#speech-language-hints)). `./run --help` and `bash -n run` passed.
+- Started the updated `./run` with the real microphone, actual keyboard device, Quickshell, and real EU Deepgram WebSocket through **READY**. The speech hint then in use was German-only (the default is now auto-detection; see [Speech language hints](#speech-language-hints)). `./run --help` and `bash -n run` passed.
 - Visually checked the actual AltGr and F4 layer-shell surfaces on Hyprland. Injected binary key events through temporary FIFO devices exercised the production observer: unrelated-key releases, matching releases, cross-keyboard release, finalization lockout, and F4 mode. Focus stayed unchanged when the overlay appeared. Checked renderer termination and child cleanup. Physical key presses, multi-monitor placement, and physical pointer click-through were not automated.
 - Pasted `Grüße, Jörg — 完全な文。` into a native Chromium text field at its existing cursor, preserving surrounding text. Read the exact UTF-8 bytes in a real Foot terminal using its Omarchy `terminal` tag and `Shift+Insert`. Confirmed the synthetic text in the existing Omarchy clipboard history by reading it, not writing it.
 - A real OpenRouter call with the new ZDR/no-data-collection controls returned the exact requested Unicode text; it replaced a fresh native PRIMARY selection without changing the prefix or suffix. No EU residency is claimed for OpenRouter. Account logging/Broadcast settings were not changed or verified.
@@ -245,8 +246,9 @@ These are synthetic key/audio replays, not physical dictations. Desktop activity
 
 - Streamed a public English speech recording (16 kHz mono PCM, 80 ms packets) to the real EU Deepgram endpoint with the production parameters and `CloseStream`. With `language_hint=de`, 2.6–3.4 s English segments returned only `Update` messages with an empty transcript, so the app had nothing to paste; the same segments transcribed correctly with `language_hint=de&language_hint=en`, with `en` alone, and without any hint. A longer 12 s English segment with the German-only hint was not empty but partly Germanized (“Yeah, as much as it's worth celebrating” became “Ja, also als muches, ähm, it's worth celebrating”), which matches intermittent partial failures rather than a single cause.
 - A public German speech recording produced the same transcript with `de`, `de+en`, and no hint; only the `en`-only hint changed one word. Adding the English hint did not change German output.
-- Re-ran the app's own URL builder (`bench.listen_url`) against the real endpoint with the new default: three short English clips and one short German clip. English returned text instead of nothing; German was unchanged.
-- Compared no hint, `de+en`, and `de` on the same seven short clips (four German 2.5–3.5 s, three English 2.6–3.4 s). No hint and `de+en` produced identical text on every clip; `de` alone returned empty text for all three English clips. A single speaker each and published recordings, so this shows no measured difference on these clips rather than proven equality in general.
+- Re-ran the app's own URL builder (`bench.listen_url`) against the real endpoint with the `de`+`en` hint set: three short English clips and one short German clip. English returned text instead of nothing; German was unchanged.
+- Compared no hint, `de+en`, and `de` on the same seven short clips (four German 2.5–3.5 s, three English 2.6–3.4 s). No hint and `de+en` produced identical text on every clip; `de` alone returned empty text for all three English clips. A single speaker each and published recordings, so this shows no measured difference on these clips rather than proven equality in general. The default is no hint because that comparison showed no cost; if German accuracy ever looks worse, `--language de --language en` restores the biased connection.
+- Verified the hint-free default on the real app: `bench.listen_url([])` builds a URL without any `language_hint`, the startup line prints `auto`, and `./run --language auto --no-overlay` reached **READY** against the real EU endpoint. `--language auto` is accepted as an explicit way to request the default.
 - The hint change adds no work to the critical path: the same single WebSocket, parameters, and audio path are used, with no additional requests or per-frame processing.
 - These checks used published recordings, not the microphone and not physical dictation. Whether a specific voice or accent behaves the same was not verified; `--language` remains the override. One artificial German-then-English splice lost its English tail with every hint set, which says nothing about real dictation.
 

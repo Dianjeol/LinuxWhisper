@@ -204,9 +204,9 @@ async def main(args):
             return
         loop.call_soon_threadsafe(events.put_nowait, ("audio", adc, bytes(data)))
 
-    hints = args.language or ["de", "en"]
-    if hints == ["auto"]:
-        hints = []  # No hint at all; Flux auto-detects the spoken language.
+    # No hint by default: Flux detects the spoken language itself. "auto" is accepted
+    # as an explicit way to say the same thing.
+    hints = [hint for hint in (args.language or []) if hint != "auto"]
     url = listen_url(hints)
     print(f"Flux Multilingual | EU only, MIP opt-out | {' '.join(hints) or 'auto'} | {args.chunk_ms} ms packets")
     print("Hold right Alt/AltGr, speak, release → paste at the current cursor. Ctrl+C quits.")
@@ -276,7 +276,7 @@ async def main(args):
 def arguments():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--language", action="append", metavar="CODE",
-                        help="Flux language_hint, repeatable; 'auto' sends none; default: de and en")
+                        help="Flux language_hint, repeatable; default: none (auto-detect)")
     parser.add_argument("--chunk-ms", type=int, choices=(20, 40, 80), default=80,
                         help="80 ms recommended by Deepgram; 20/40 ms for comparison")
     parser.add_argument("--device", help="PortAudio device name (list: .venv/bin/python -m sounddevice)")
