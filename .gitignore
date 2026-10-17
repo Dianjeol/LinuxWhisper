@@ -1,12 +1,29 @@
-__pycache__/
-*.pyc
-.env
+# Lokale Umgebung und Schlüssel
+.venv/
 venv/
-.idea/
-.vscode/
-*.swp
-*.log
-/tmp/
+.env
+.env.*
+*.key
+*.pem
+
+# Python-Artefakte
+__pycache__/
+*.py[cod]
 *.egg-info/
-dist/
 build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Lokale Messungen und Aufnahmen
+*.log
+*.wav
+*.flac
+*.mp3
+*.ogg
+*.opus
+*.m4a
+*.pcm
+*.raw

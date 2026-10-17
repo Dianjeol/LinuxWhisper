@@ -1,184 +1,68 @@
-<div align="center">
-
-<img src="assets/logo.png" alt="LinuxWhisper Logo" width="180" height="auto" />
-
 # LinuxWhisper
 
-**A Voice-Assistant & AI Companion for Linux**
+Diktieren unter Omarchy: **Rechtes Alt/AltGr halten, sprechen, loslassen.** Der vollständige Text wird am Cursor eingefügt und von der vorhandenen Clipboard-History erfasst.
 
-[![Python 3.8+](https://img.shields.io/badge/Python-3.8%2B-blue?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-emerald?style=for-the-badge)](LICENSE)
-[![Chat & Rewrite: OpenRouter](https://img.shields.io/badge/Chat%20%26%20Rewrite-OpenRouter-6467F2?style=for-the-badge)](https://openrouter.ai)
-[![Vision & TTS: Groq](https://img.shields.io/badge/Vision%20%26%20TTS-Groq-FF6B35?style=for-the-badge)](https://groq.com)
-[![Dictation: Deepgram](https://img.shields.io/badge/Dictation-Deepgram%20Nova--3-13EF93?style=for-the-badge)](https://deepgram.com)
+Nutzt Deepgram Flux Multilingual, standardmäßig auf Deutsch am EU-Endpunkt. Trotz des Namens kein lokales Whisper-Modell.
 
----
+## Einrichtung
 
-**LinuxWhisper** is a simple voice assistant designed to help you with daily tasks. It uses global hotkeys to provide AI-powered tools without switching windows.
+Voraussetzungen: Omarchy mit Hyprland/Wayland, Python ≥ 3.11, Mikrofon, laufende Omarchy-Clipboard-Erfassung und Leserechte auf die Tastaturgeräte unter `/dev/input/event*`. Diese Rechte ermöglichen das Mitlesen von Tastatureingaben; die App nicht mit `sudo` starten.
 
-<br />
+Im Projektverzeichnis:
 
-![LinuxWhisper Demo](assets/demo.gif)
-
-</div>
-
-## Features
-
-- 🎙️ **Dictation**: Voice-to-text at your cursor using **Deepgram Nova-3** (live streaming; the
-  recording overlay shows the transcript while you speak, the finished text is inserted on release).
-- 💬 **AI Chat**: Helpful Q&A and conversation on **OpenRouter** (`deepseek/deepseek-v4.1-flash`).
-- ✍️ **Smart Rewrite**: Modify selected text using your voice.
-- 👁️ **Vision**: Understand screenshots using **Qwen3.8** (`qwen/qwen3.8-27b` on Groq).
-- 🔊 **Voice Feedback**: Optional text-to-speech for AI responses (toggle in the tray menu).
-
----
-
-## 🖥️ Supported Platforms
-
-| Distribution | Display Server | Status |
-|:---|:---|:---|
-| **Debian / Ubuntu** | X11 | ✅ Fully supported |
-| **Debian / Ubuntu** | Wayland | ✅ Supported |
-| **Fedora / RHEL** | X11 | ✅ Supported |
-| **Fedora / RHEL** | Wayland | ✅ Supported |
-| **Arch Linux** | X11 | ✅ Supported |
-| **Arch Linux** | Wayland / **Hyprland** (Omarchy) | ✅ Supported |
-| **Arch Linux** | Wayland / **Niri** | ✅ Fully supported |
-
-The app auto-detects your session type (X11 or Wayland) and uses the appropriate backends:
-
-| Feature | X11 | Wayland |
-|:---|:---|:---|
-| Clipboard | `xclip` | `wl-clipboard` |
-| Key Simulation | `xdotool` | `wtype` |
-| Screenshots | `gnome-screenshot` | `grim` |
-| Overlays | GTK Window Hints | `gtk-layer-shell` |
-| Global Hotkeys | `evdev` | `evdev` |
-
----
-
-## ⌨️ Command Center
-
-| Key | Action | Purpose | Backend / Model |
-|:---:|:---|:---|:---|
-| `F3` / R-Alt | **Dictate** | Transcribe voice to text at cursor | Deepgram `nova-3` (streaming, `language=multi`) |
-| `F4` | **Chat** | Open/Focus AI conversation | OpenRouter or Groq — model selectable in settings |
-| `F8` | **Vision** | Screenshot + Intelligent Analysis | Groq `qwen/qwen3.8-27b` |
-| `F9` | **Rewrite** | Highlight text → Speak to modify | OpenRouter or Groq — model selectable in settings |
-
-Chat and Rewrite default to OpenRouter `deepseek/deepseek-v4.1-flash`. Both can be switched to another
-provider (*OpenRouter* or *Groq*) and to any model that provider offers — the settings dialog fetches the
-provider's model list live. The choice lives in `settings.json` (`chat_provider`, `chat_model`,
-`rewrite_provider`, `rewrite_model`).
-
-Pinning the chat overlay and voice feedback have no hotkey — both live in the tray menu
-(see the tip below). TTS uses Groq `canopylabs/orpheus-v1-english`.
-
----
-
-## 🛠️ Quick Start
-
-### 1. Requirements
-*   **Linux** (Debian/Ubuntu, Fedora/RHEL or Arch Linux)
-*   **OpenRouter API Key**: [openrouter.ai/keys](https://openrouter.ai/keys) — used by chat and
-    rewrite while their provider is set to OpenRouter (default `deepseek/deepseek-v4.1-flash`)
-*   **Groq API Key**: [Get your free key here](https://console.groq.com) — always needed for vision
-    (`qwen/qwen3.8-27b`) and TTS, and for chat/rewrite when their provider is set to Groq
-*   **Deepgram API Key**: [console.deepgram.com](https://console.deepgram.com) — dictation is transcribed by
-    Deepgram's streaming API (`nova-3`, `language=multi`)
-*   **User in `input` group** (for global hotkeys):
-    ```bash
-    sudo usermod -aG input $USER
-    # Log out and back in after this
-    ```
-
-### 2. Installation
 ```bash
-git clone https://github.com/Dianjeol/LinuxWhisper.git && cd LinuxWhisper
-./setup.sh
+sudo pacman -S --needed python python-pip base-devel linux-api-headers portaudio wl-clipboard
+python -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
 ```
 
-The setup script automatically detects your distribution and session type, then installs the correct packages.
+Bei der [Anmeldung bei Deepgram](https://console.deepgram.com/signup) erhalten neue Konten kostenloses API-Startguthaben. Danach gelten die [Nutzungspreise](https://deepgram.com/pricing). Dort einen API-Key erstellen und in Bash für die aktuelle Sitzung setzen, ohne ihn in der Shell-History zu speichern:
 
-### 3. Launch
 ```bash
-# Set your API Keys once
-export OPENROUTER_API_KEY="your_key"
-export GROQ_API_KEY="your_key"
-export DEEPGRAM_API_KEY="your_key"
-
-# Start the assistant
-linuxwhisper
-
-# Or alternatively:
-python -m linuxwhisper
+read -rsp 'Deepgram API-Key: ' DEEPGRAM_API_KEY; echo
+export DEEPGRAM_API_KEY
+./run
 ```
 
-> [!TIP]
-> Use the **System Tray** icon or the ⚙️ icon in the chat overlay to open the settings: TTS voice,
-> **AI models** (provider + model for Chat/F4 and Rewrite/F9, loaded from the provider), color scheme
-> and the hotkey list.
-> **Pin Chat Overlay** (stay visible instead of auto-hiding) and **Voice Feedback (TTS)** are toggled in the
-> tray menu — they no longer have hotkeys. Pinning is off by default, so the chat overlay hides itself again
-> after a few seconds.
+`./run` nutzt `DEEPGRAM_API_KEY`; fehlt die Variable, lädt der Launcher die interaktive Bash mit `~/.bashrc`. Eine `.env`-Datei wird nicht geladen. API-Keys niemals committen.
 
----
+## Nutzung
 
-### Niri Users
+Auf **BEREIT** warten, ein Textfeld fokussieren und diktieren. Mikrofon und Verbindung sind dann vorbereitet. **Strg+C** beendet; nur eine Instanz gleichzeitig starten. Es werden keine Bindings, Autostarts oder Dienste eingerichtet.
 
-For best overlay behaviour, add these rules to `~/.config/niri/config.kdl`:
+- AltGr bleibt für andere Apps sichtbar: Auch AltGr-Tastenkombinationen starten eine Aufnahme. Linkes Alt nicht.
+- Einfügen erfolgt einmal: `Strg+V` in Apps, `Umschalt+Einfügen` in Fenstern mit Omarchys `terminal`-Tag. Kein zusätzliches Enter, kein Fokuswechsel.
+- Während des Abschlusses im gewünschten Textfeld bleiben. Gesperrte Flächen und abweichende Paste-Kürzel werden nicht universell unterstützt; Terminale behandeln Zeilenumbrüche gemäß ihrer Konfiguration.
+- Clipboard-History öffnen: **Super+Strg+V**. Die App nutzt den bestehenden Omarchy-Watcher, keine eigene History.
 
-```kdl
-layer-rule {
-    match namespace="linuxwhisper-recording"
-    shadow { on false }
-}
-
-layer-rule {
-    match namespace="linuxwhisper-chat"
-    shadow { on false }
-}
+```bash
+./run --once                 # Ein Diktat, dann beenden
+./run --help                 # Alle Optionen, etwa Sprache, Region und Logpfad
+.venv/bin/python -m sounddevice  # Audiogeräte auflisten
 ```
 
-### Hyprland / Omarchy Users
+## Daten und Latenz
 
-No extra compositor rules needed — the overlays use `gtk-layer-shell`, which Hyprland supports natively.
+Das Mikrofon bleibt geöffnet; Audio außerhalb der gehaltenen Taste wird lokal verworfen. Während des Diktats wird Audio an Deepgram übertragen, aber von der App nicht als Datei gespeichert. Der Text ersetzt die Zwischenablage und bleibt in der lokalen Clipboard-History erhalten.
 
----
+Pro erfolgreichem, nichtleerem Diktat wird eine Zahl in Millisekunden geschrieben:
 
-## 📂 Project Structure
-
+```text
+${XDG_STATE_HOME:-$HOME/.local/state}/sound/latency.log
 ```
-src/linuxwhisper/
-├── __init__.py          # Package version
-├── __main__.py          # python -m linuxwhisper
-├── app.py               # main() entry point
-├── config.py            # Config dataclass + CFG singleton
-├── state.py             # AppState + SettingsManager + STATE
-├── api.py               # Groq + OpenRouter client initialization
-├── decorators.py        # safe_execute, run_on_main_thread
-├── platform/
-│   ├── __init__.py      # Session detection + backend factory
-│   ├── base.py          # Abstract base classes (ABCs)
-│   ├── x11.py           # X11 backends (xdotool, xclip, gnome-screenshot)
-│   └── wayland.py       # Wayland backends (wtype, wl-clipboard, grim)
-├── services/
-│   ├── audio.py         # AudioService (recording + streaming to Deepgram)
-│   ├── deepgram.py      # DeepgramLiveSession (live WebSocket transcription)
-│   ├── ai.py            # AIService (chat + vision)
-│   ├── tts.py           # TTSService (Orpheus voice)
-│   ├── clipboard.py     # ClipboardService (uses platform backends)
-│   └── image.py         # ImageService (uses platform backends)
-├── managers/
-│   ├── history.py       # HistoryManager (conversation + tray history)
-│   ├── chat.py          # ChatManager (overlay state + auto-hide)
-│   └── overlay.py       # OverlayManager (recording indicator)
-├── ui/
-│   ├── recording_overlay.py  # GtkOverlay (waveform + gtk-layer-shell)
-│   ├── chat_overlay.py       # ChatOverlay (WebKit2 + gtk-layer-shell)
-│   ├── settings_dialog.py    # SettingsDialog (voice, models, schemes, hotkeys)
-│   └── tray.py               # TrayManager (AppIndicator)
-└── handlers/
-    ├── mode.py           # ModeHandler (dictation/AI/rewrite/vision)
-    └── keyboard.py       # KeyboardHandler (evdev listener)
-```
+
+Gemessen wird **Alt loslassen → Einfügebefehl von Hyprland bestätigt**: einschließlich Audiorest, vollständigem Decoder-Abschluss mit `CloseStream` und Clipboard-Übergabe. Das bestätigt weder die Verarbeitung noch die sichtbare Darstellung durch die Zielanwendung; die spätere History-Speicherung gehört ebenfalls nicht zur Messung.
+
+Log-Schreiben und Terminalausgabe erfolgen erst danach. Das Log enthält weder Audio noch Transkripte oder API-Keys. Stille und fehlgeschlagene Übergaben erzeugen keinen Erfolgswert; ein späterer Logfehler kann trotz bereits eingefügtem Text auftreten. Entwicklungsregeln: [AGENTS.md](AGENTS.md).
+
+## Prüfstand
+
+Bisher lokal dokumentiert: echte Deepgram-Transkription mit vollständigem Satzende, Unicode und Cursor-Selektion im GUI-Textfeld, Terminal-Paste, Clipboard-History, Stille, Übergabefehler und samplegenaue Alt-Grenzen. Physische Alt-Tastendrücke wurden nicht automatisiert.
+
+Für diese Veröffentlichungsvorbereitung geprüft: isolierte Python-3.14-Installation, `pip check`, `./run --help` und Bash-Syntax. Git-Staging in einer temporären Kopie schließt Umgebung, Schlüsseldateien, Audio, Logs und Bytecode aus; ein Muster-Scan nach Zugangsdaten blieb ohne Fund.
+
+Aufnahme- und Einfügecode bleiben unverändert; GUI-Diktate wurden dafür nicht erneut geprüft. Ein kontrollierter Vorher-/Nachher-Latenzvergleich liegt nicht vor; keine behauptete Beschleunigung.
+
+## Lizenz
+
+[MIT](LICENSE).

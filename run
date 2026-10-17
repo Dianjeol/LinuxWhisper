@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -e
+here=$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")
+if [[ -z ${DEEPGRAM_API_KEY:-} ]]; then
+  exec bash -ic 'exec "$1/.venv/bin/python" "$1/bench.py" "${@:2}"' _ "$here" "$@"
+fi
+exec "$here/.venv/bin/python" "$here/bench.py" "$@"
