@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import patch
 
 from agent import Agent
-from bench import RATE, Take, capture_take
+from bench import RATE, Take, capture_take, receive
 from evdev.ecodes import KEY_F4, KEY_RIGHTALT
 
 
@@ -46,6 +46,19 @@ class RecordingBoundaries(unittest.IsolatedAsyncioTestCase):
                 await capture_take(ws, events, take, 80)
                 self.assertEqual(bytes(ws.audio), struct.pack('<10h', *range(3, 13)))
                 self.assertEqual(take.released, adc + 12.5 / RATE)
+
+
+class TranscriptionErrors(unittest.IsolatedAsyncioTestCase):
+    async def test_provider_errors_abort_without_exposing_private_content(self):
+        for kind in ('Error', 'FatalError', 'ConfigureFailure'):
+            with self.subTest(kind=kind):
+                async def messages():
+                    yield json.dumps({'type': kind, 'description': 'private spoken content'})
+
+                with self.assertRaises(RuntimeError) as failure:
+                    await receive(messages(), Take(0))
+                self.assertNotIn('private spoken content', str(failure.exception))
+                self.assertIn(kind, str(failure.exception))
 
 
 class AgentResponses(unittest.IsolatedAsyncioTestCase):
@@ -106,6 +119,11 @@ class AgentResponses(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(RuntimeError) as failure:
             await self.request({'error': {'message': 'privater markierter Text'}}, status=401)
         self.assertIn('401', str(failure.exception))
+        self.assertNotIn('privater', str(failure.exception))
+
+    async def test_provider_error_inside_success_response_is_not_inserted(self):
+        with self.assertRaises(RuntimeError) as failure:
+            await self.request({'error': {'message': 'privater markierter Text'}})
         self.assertNotIn('privater', str(failure.exception))
 
 

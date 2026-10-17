@@ -13,7 +13,7 @@ class Desktop:
         signature = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE")
         self.wl_copy = shutil.which("wl-copy")
         if not runtime or not signature or not self.wl_copy:
-            raise RuntimeError("Omarchy/Hyprland unter Wayland und wl-copy werden benötigt.")
+            raise RuntimeError("Omarchy/Hyprland on Wayland and wl-copy are required.")
         self.socket = Path(runtime) / "hypr" / signature / ".socket.sock"
 
     async def request(self, command):
@@ -35,7 +35,7 @@ class Desktop:
         """Snapshot PRIMARY during F4 recording; never overwrite the clipboard."""
         wl_paste = shutil.which("wl-paste")
         if not wl_paste:
-            raise RuntimeError("F4 benötigt wl-paste aus wl-clipboard.")
+            raise RuntimeError("F4 requires wl-paste from wl-clipboard.")
         process = await asyncio.create_subprocess_exec(
             wl_paste, "--primary", "--no-newline", "--type", "text",
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
@@ -49,10 +49,10 @@ class Desktop:
                 process.kill()
             await process.wait()
         if process.returncode or not text.strip():
-            raise RuntimeError("Keine Textauswahl verfügbar; Text markieren und F4 erneut halten.")
+            raise RuntimeError("No text selection available; select text and hold F4 again.")
         target = json.loads(active).get("address")
         if not target:
-            raise RuntimeError("F4 benötigt ein fokussiertes Anwendungsfenster.")
+            raise RuntimeError("F4 requires a focused application window.")
         return text.decode("utf-8"), target
 
     async def copy(self, text):
@@ -75,7 +75,7 @@ class Desktop:
             await process.wait()
             raise
         if process.returncode:
-            raise RuntimeError(f"Clipboard-Übergabe fehlgeschlagen (wl-copy: {process.returncode}).")
+            raise RuntimeError(f"Clipboard handoff failed (wl-copy: {process.returncode}).")
 
     async def paste(self, text, target=None):
         # Clipboard setup and window classification are independent. Omarchy's
@@ -83,7 +83,7 @@ class Desktop:
         active, _ = await asyncio.gather(self.request("j/activewindow"), self.copy(text))
         window = json.loads(active)
         if target is not None and window.get("address") != target:
-            raise RuntimeError("Fokus gewechselt; Antwort nur im Clipboard, nicht eingefügt.")
+            raise RuntimeError("Focus changed; response is only on the clipboard, not pasted.")
         terminal = any(tag.rstrip("*") == "terminal" for tag in window.get("tags", []))
         mods, key = ("SHIFT", "Insert") if terminal else ("CTRL", "V")
         # No window argument: reach the focused surface, including layer shells.
@@ -92,10 +92,10 @@ class Desktop:
             response = await self.request(
                 f'/dispatch hl.dsp.send_key_state({{mods="{mods}",key="{key}",state="down"}})')
             if response.strip() != "ok":
-                raise RuntimeError(f"Einfügen fehlgeschlagen: {response.strip()}")
+                raise RuntimeError(f"Paste failed: {response.strip()}")
         finally:
             response = await self.request(
                 f'/dispatch hl.dsp.send_key_state({{mods="{mods}",key="{key}",state="up"}})')
             if response.strip() != "ok":
-                raise RuntimeError(f"Paste-Taste konnte nicht losgelassen werden: {response.strip()}")
+                raise RuntimeError(f"Could not release the paste key: {response.strip()}")
         return time.monotonic()

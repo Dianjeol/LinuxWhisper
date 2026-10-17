@@ -1,4 +1,4 @@
-# Lokale Umgebung und Schlüssel
+# Local environment and secrets
 .venv/
 venv/
 .env
@@ -6,7 +6,7 @@ venv/
 *.key
 *.pem
 
-# Python-Artefakte
+# Python artifacts
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -17,7 +17,7 @@ dist/
 .coverage
 htmlcov/
 
-# Lokale Messungen und Aufnahmen
+# Local measurements and recordings
 *.log
 *.wav
 *.flac

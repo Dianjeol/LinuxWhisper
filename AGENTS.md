@@ -1,27 +1,27 @@
-# Projekt: latenzarme Diktierapp für Omarchy
+# Project: low-latency dictation app for Omarchy
 
-## Oberstes Ziel
+## Primary goal
 
-Nach dem Loslassen von rechtem Alt/AltGr muss der vollständige Text so schnell wie möglich am Cursor der fokussierten Anwendung eingefügt werden und in der vorhandenen Omarchy-Clipboard-History stehen. Korrekte, vollständige Transkription bleibt Voraussetzung; Text abschneiden ist keine Optimierung.
+After releasing right Alt/AltGr, insert the complete text at the cursor in the focused application as quickly as possible and make it available in the existing Omarchy clipboard history. Correct, complete transcription remains a prerequisite; truncating text is not an optimization.
 
-Die einzige dauerhaft protokollierte Kennzahl ist **Alt loslassen → Einfügebefehl von Hyprland bestätigt**, in Millisekunden, ein Wert pro erfolgreichem Diktat. Sie umfasst Decoder-Abschluss, Clipboard-Übergabe und Paste-Befehl. Hyprland bestätigt nicht die Textverarbeitung oder sichtbare Darstellung durch eine beliebige Zielanwendung. Diesen Proxy niemals als gemessenen Pixelzeitpunkt ausgeben oder die Messgrenze vorverlegen, um bessere Zahlen zu erzeugen.
+The only persistently logged metric is **Alt released → paste command acknowledged by Hyprland**, in milliseconds, one value per successful dictation. It includes decoder finalization, clipboard handoff, and the paste command. Hyprland does not confirm text processing or visible rendering by an arbitrary target application. Never present this proxy as a measured on-screen rendering time or move the measurement boundary earlier to produce better numbers.
 
-## Verbindliche Performance-Regeln
+## Mandatory performance rules
 
-- Keine Änderung darf diese Latenz absichtlich verschlechtern. Neue Funktionen gehören außerhalb des kritischen Pfads. Bei einem unvermeidlichen Zielkonflikt zuerst den Nutzer entscheiden lassen.
-- Kritischer Pfad: letzte Audioframes → vollständiger Decoder-Abschluss → Clipboard bereit → Paste bestätigt. Davor keine Log-/History-Dateischreibzugriffe, Terminalausgaben, Benachrichtigungen, Textnachbearbeitungsdienste oder zusätzlichen Netzwerkanfragen.
-- Keine pauschalen Sleeps, künstlichen Tastaturverzögerungen, Zeichen-für-Zeichen-Eingabe, Fokuswechsel oder App-Starts zum Einfügen. Auf tatsächliche Protokollantworten warten, nicht auf geschätzte Bereitschaftszeiten.
-- Mikrofon und WebSocket vor `BEREIT` vorbereiten. Während Alt streamen; nicht erst nach dem Loslassen hochladen. Audio außerhalb der Taste lokal verwerfen.
-- `CloseStream` verarbeitet den Audiorest. Nicht durch `ForceEndTurn` ersetzen: Eine schnelle Bestätigung des letzten Zwischenstands ist kein vollständiges Transkript.
-- Nur einen Paste-Vorgang pro Diktat. Clipboard-History vom bestehenden Omarchy-Watcher erfassen lassen; keine eigene History-Datenbank und keine konkurrierenden Schreibzugriffe auf Omarchys History-Datei.
-- Im Audio-/Streamingpfad keine VAD-, Wortzeitstempel- oder Nebenmetrik-Auswertung ohne konkreten, vom Nutzer freigegebenen Bedarf. Keine neuen Bibliotheken oder Dienste ohne nachweislichen Nutzen für das Ziel.
-- Den Messwert erst nach der Paste-Bestätigung schreiben. Keine Audioframes, API-Keys oder Transkripte ins Performance-Log. Stille und fehlgeschlagene Übergaben ergeben keinen erfolgreichen Messwert.
+- No change may intentionally worsen this latency. New features belong outside the critical path. If a trade-off is unavoidable, let the user decide first.
+- Critical path: final audio frames → complete decoder finalization → clipboard ready → paste acknowledged. Before that, no log/history file writes, terminal output, notifications, text post-processing services, or additional network requests.
+- No blanket sleeps, artificial keyboard delays, character-by-character input, focus changes, or application launches for pasting. Wait for actual protocol responses, not estimated readiness times.
+- Prepare the microphone and WebSocket before `READY`. Stream while Alt is held; do not wait until release to upload. Discard audio outside the held-key interval locally.
+- `CloseStream` processes the remaining audio. Do not replace it with `ForceEndTurn`: a quick acknowledgment of the last interim result is not a complete transcript.
+- Only one paste operation per dictation. Let the existing Omarchy watcher capture clipboard history; no separate history database and no competing writes to Omarchy's history file.
+- No VAD, word-timestamp, or secondary-metric processing in the audio/streaming path without a concrete, user-approved need. No new libraries or services without demonstrable benefit to the goal.
+- Write the measurement only after paste acknowledgment. No audio frames, API keys, or transcripts in the performance log. Silence and failed handoffs do not produce a successful measurement.
 
-## Arbeitsweise und Nachweis
+## Workflow and evidence
 
-- Bestehende Muster in `bench.py` und `desktop.py` weiterverwenden; kleine, direkte Implementierung statt zusätzlicher Frameworks.
-- Änderungen am kritischen Pfad vor/nachher unter vergleichbaren Bedingungen mit mehreren echten Diktaten prüfen. Median und p95 der einen Kennzahl vergleichen; Netzwerkstreuung nicht als Verbesserung verkaufen. Ohne Vergleich keine behauptete Beschleunigung oder Regressionsfreiheit.
-- Tatsächliches Einfügen in GUI-Textfeld und Terminal sowie Aufnahme in die vorhandene Clipboard-History praktisch prüfen. Unicode, Cursorposition, Stille und Fehler berücksichtigen. Keine Tests, die nur Quelltext oder interne Verdrahtung bestätigen.
-- Vollständigkeit des letzten Wortes und samplegenaue Alt-Grenzen bewahren. Audioverlust macht den Durchlauf ungültig.
-- Keine dauerhaften Hyprland-Bindings, Autostarts, Dienste oder Desktop-Konfigurationsänderungen ohne Auftrag. Installierte Omarchy-Dateien unter `/usr/share/omarchy` nur lesen.
-- Verhaltensänderungen und tatsächlich ausgeführte Prüfungen in `README.md` dokumentieren. Einschränkungen offen benennen: Nicht jede Anwendung unterstützt dieselben Paste-Kürzel; eine nicht editierbare oder gesperrte Oberfläche ist kein Eingabefeld.
+- Reuse existing patterns in `bench.py` and `desktop.py`; prefer small, direct implementations over additional frameworks.
+- Check critical-path changes before and after under comparable conditions with several real dictations. Compare the median and p95 of the single metric; do not present network variability as an improvement. Without a comparison, do not claim a speedup or freedom from regressions.
+- Practically verify actual insertion into a GUI text field and a terminal, as well as capture in the existing clipboard history. Cover Unicode, cursor position, silence, and errors. No tests that only confirm source text or internal wiring.
+- Preserve the complete final word and sample-accurate Alt boundaries. Audio loss invalidates the run.
+- No persistent Hyprland bindings, autostarts, services, or desktop configuration changes unless requested. Only read installed Omarchy files under `/usr/share/omarchy`.
+- Document behavior changes and checks actually performed in `README.md`. State limitations openly: not every application supports the same paste shortcuts; a non-editable or locked surface is not an input field.
