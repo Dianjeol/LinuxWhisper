@@ -173,6 +173,14 @@ def keyboards(loop, events):
         raise
 
 
+def listen_url(hints):
+    """EU-only Flux URL; every hint is a separate language_hint parameter."""
+    params = [("model", "flux-general-multi"), *(("language_hint", hint) for hint in hints),
+              ("encoding", "linear16"), ("sample_rate", RATE), ("eot_threshold", "1.0"),
+              ("eot_timeout_ms", 60000), ("mip_opt_out", "true")]
+    return f"wss://api.eu.deepgram.com/v2/listen?{urlencode(params)}"
+
+
 async def main(args):
     key = os.environ.get("DEEPGRAM_API_KEY")
     if not key:
@@ -196,11 +204,11 @@ async def main(args):
             return
         loop.call_soon_threadsafe(events.put_nowait, ("audio", adc, bytes(data)))
 
-    params = dict(model="flux-general-multi", language_hint=args.language,
-                  encoding="linear16", sample_rate=RATE, eot_threshold="1.0",
-                  eot_timeout_ms=60000, mip_opt_out="true")
-    url = f"wss://api.eu.deepgram.com/v2/listen?{urlencode(params)}"
-    print(f"Flux Multilingual | EU only, MIP opt-out | {args.language} | {args.chunk_ms} ms packets")
+    hints = args.language or ["de", "en"]
+    if hints == ["auto"]:
+        hints = []  # No hint at all; Flux auto-detects the spoken language.
+    url = listen_url(hints)
+    print(f"Flux Multilingual | EU only, MIP opt-out | {' '.join(hints) or 'auto'} | {args.chunk_ms} ms packets")
     print("Hold right Alt/AltGr, speak, release → paste at the current cursor. Ctrl+C quits.")
     print("Hold F4 → spoken instruction + selected text → DeepSeek response at the cursor.")
     if not agent_key:
@@ -267,7 +275,8 @@ async def main(args):
 
 def arguments():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--language", default="de", help="Flux language_hint (default: de)")
+    parser.add_argument("--language", action="append", metavar="CODE",
+                        help="Flux language_hint, repeatable; 'auto' sends none; default: de and en")
     parser.add_argument("--chunk-ms", type=int, choices=(20, 40, 80), default=80,
                         help="80 ms recommended by Deepgram; 20/40 ms for comparison")
     parser.add_argument("--device", help="PortAudio device name (list: .venv/bin/python -m sounddevice)")
