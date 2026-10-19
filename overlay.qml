@@ -31,7 +31,14 @@ ShellRoot {
                 }
             }
         }
-        onConnectedChanged: if (!connected) Quickshell.quit()
+        onConnectedChanged: if (!connected) {
+            root.mode = "idle"
+            Qt.callLater(Qt.quit)
+        }
+        onError: {
+            root.mode = "idle"
+            Qt.callLater(Qt.quit)
+        }
     }
 
     PanelWindow {

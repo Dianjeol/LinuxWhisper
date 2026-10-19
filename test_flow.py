@@ -1,15 +1,21 @@
+import argparse
 import asyncio
+from contextlib import asynccontextmanager, suppress
 from http.client import HTTPConnection
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import os
+from pathlib import Path
 from queue import Queue
 import struct
+import tempfile
 import threading
 import unittest
 from unittest.mock import patch
 
+import bench
 from agent import Agent
-from bench import RATE, Take, capture_take, receive
+from bench import RATE, Take, capture_take, main, receive
 from evdev.ecodes import KEY_F4, KEY_RIGHTALT
 from overlay import volume_level
 
@@ -144,6 +150,73 @@ class AgentResponses(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(RuntimeError) as failure:
             await self.request({'error': {'message': 'privater markierter Text'}})
         self.assertNotIn('privater', str(failure.exception))
+
+
+class IdleReconnect(unittest.IsolatedAsyncioTestCase):
+    async def test_closed_idle_socket_reconnects_and_keeps_running(self):
+        connections = []
+
+        class Socket:
+            def __init__(self):
+                self.closed = asyncio.Event()
+
+            async def recv(self):
+                return json.dumps({'type': 'Connected'})
+
+            async def wait_closed(self):
+                await self.closed.wait()
+
+            async def send(self, data):
+                pass
+
+        @asynccontextmanager
+        async def fake_connect(*args, **kwargs):
+            socket = Socket()
+            connections.append(socket)
+            if len(connections) == 1:
+                asyncio.get_running_loop().call_soon(socket.closed.set)
+            try:
+                yield socket
+            finally:
+                socket.closed.set()
+
+        class DummyStream:
+            def __init__(self, **kwargs):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        class DummyDesktop:
+            async def check(self):
+                pass
+
+        with tempfile.TemporaryDirectory() as directory, \
+                patch.dict(os.environ, {'XDG_STATE_HOME': directory}), \
+                patch.object(bench, 'connect', fake_connect), \
+                patch.object(bench, 'keyboards', lambda loop, events: []), \
+                patch.object(bench.sd, 'RawInputStream', DummyStream), \
+                patch.object(bench, 'Desktop', DummyDesktop):
+            args = argparse.Namespace(
+                language=None, chunk_ms=80, device=None, once=False,
+                no_overlay=True, log=Path(directory) / 'latency.log')
+            task = asyncio.create_task(main(args))
+            try:
+                for _ in range(100):
+                    if len(connections) >= 2:
+                        break
+                    await asyncio.sleep(0.01)
+                self.assertGreaterEqual(len(connections), 2)
+                self.assertFalse(task.done())
+            finally:
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task
+            log = (Path(directory) / 'linuxwhisper' / 'app.log').read_text()
+            self.assertIn('connection lost while idle; reconnecting', log)
 
 
 if __name__ == '__main__':

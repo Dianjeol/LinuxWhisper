@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import struct
 import time
+import traceback
 from urllib.parse import urlencode
 
 import evdev
@@ -25,6 +26,36 @@ from overlay import Overlay
 RATE = 16000
 FRAME = 160  # 10 ms, mono, signed little-endian PCM16
 KEYS = (evdev.ecodes.KEY_RIGHTALT, evdev.ecodes.KEY_F4)
+
+
+class FatalError(RuntimeError):
+    """A local failure that opening a new WebSocket cannot fix."""
+
+
+def state_directory():
+    return Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state")
+
+
+def app_log(message):
+    """Append a lifecycle or error line; never part of a successful take."""
+    path = state_directory() / "linuxwhisper" / "app.log"
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as stream:
+            stream.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S%z')} {message}\n")
+    except OSError:
+        pass
+
+
+async def watch_closed(ws, events, token):
+    """Wake the idle loop when the server or network closes the socket."""
+    try:
+        await ws.wait_closed()
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        pass
+    events.put_nowait(("connection", time.monotonic(), token))
 
 
 def clip(data, adc, pressed, released=None):
@@ -191,12 +222,16 @@ async def main(args):
     args.log.parent.mkdir(parents=True, exist_ok=True)
     loop = asyncio.get_running_loop()
     events = asyncio.Queue()
+    listening = [False]
     devices = keyboards(loop, events)
 
     def microphone(data, frames, timing, status):
         now = time.monotonic()
         if status:
             loop.call_soon_threadsafe(events.put_nowait, ("error", now, f"Audio loss: {status}; measurement invalid."))
+            return
+        # No connection means no take: dropping audio keeps a long outage bounded.
+        if not listening[0]:
             return
         adc = now + timing.inputBufferAdcTime - timing.currentTime
         if not 0 <= timing.currentTime - timing.inputBufferAdcTime < 1:
@@ -216,6 +251,7 @@ async def main(args):
     print("Microphone warms up locally; only audio during AltGr/F4 is sent. Idle: WebSocket pings only.", flush=True)
     print(f"Latency log (ms, one value per dictation): {args.log}", flush=True)
     overlay = None
+    delay = 2.0
     try:
         if not args.no_overlay:
             overlay = Overlay(devices, bool(agent_key))
@@ -223,46 +259,80 @@ async def main(args):
                 samplerate=RATE, channels=1, dtype="int16", blocksize=FRAME,
                 latency="low", device=args.device, callback=microphone):
             while True:
-                async with connect(url, additional_headers={"Authorization": f"Token {key}"},
-                                   compression=None, ping_interval=15, open_timeout=15, close_timeout=3) as ws:
-                    hello = json.loads(await asyncio.wait_for(ws.recv(), timeout=15))
-                    if hello.get("type") != "Connected":
-                        raise RuntimeError(f"Deepgram connection failed ({hello.get('type', 'unknown response')}).")
-                    if overlay is not None:
-                        overlay.ready()
-                    ready = time.monotonic()
-                    print("\nREADY — hold AltGr to dictate, F4 to edit the text selection.", flush=True)
-                    recent = deque(maxlen=20)
-                    while True:
-                        kind, when, data = await events.get()
-                        if kind == "error":
-                            raise RuntimeError(data)
-                        if kind == "audio":
-                            recent.append((kind, when, data))
-                        if kind == "down" and when >= ready:
-                            if data == evdev.ecodes.KEY_F4 and not agent_key:
-                                print("F4 requires OPENROUTER_API_KEY (loaded from ~/.bashrc by ./run).", flush=True)
-                                continue
-                            take = Take(when, key=data)
-                            # Preserve ADC samples that arrived just before the key event.
-                            buffered = list(recent)
-                            remaining = []
-                            while not events.empty():
-                                remaining.append(events.get_nowait())
-                            for event in buffered + remaining:
-                                events.put_nowait(event)
-                            print("RECORDING …", flush=True)
-                            if take.key == evdev.ecodes.KEY_F4:
-                                try:
-                                    await agent_take(ws, events, take, args.chunk_ms, desktop, agent_key, overlay)
-                                except (RuntimeError, OSError, TimeoutError, UnicodeError) as error:
-                                    print(f"F4 failed: {error}", flush=True)
-                            else:
-                                await capture_take(ws, events, take, args.chunk_ms, overlay)
-                                await finish_take(take, desktop, latency_log)
-                            for warning in take.warnings:
-                                print("Deepgram warning:", warning.get("code", "unspecified"), flush=True)
-                            break
+                token = object()
+                try:
+                    async with connect(url, additional_headers={"Authorization": f"Token {key}"},
+                                       compression=None, ping_interval=15, open_timeout=15, close_timeout=3) as ws:
+                        hello = json.loads(await asyncio.wait_for(ws.recv(), timeout=15))
+                        if hello.get("type") != "Connected":
+                            raise RuntimeError(f"Deepgram connection failed ({hello.get('type', 'unknown response')}).")
+                        if overlay is not None:
+                            overlay.ready()
+                        ready = time.monotonic()
+                        app_log("ready")
+                        print("\nREADY — hold AltGr to dictate, F4 to edit the text selection.", flush=True)
+                        closed = asyncio.create_task(watch_closed(ws, events, token))
+                        try:
+                            listening[0] = True
+                            recent = deque(maxlen=20)
+                            while True:
+                                kind, when, data = await events.get()
+                                if kind == "connection":
+                                    if data is token:
+                                        print("Connection lost; reconnecting …", flush=True)
+                                        app_log("connection lost while idle; reconnecting")
+                                        break
+                                    continue
+                                if kind == "error":
+                                    raise FatalError(data)
+                                if kind == "audio":
+                                    recent.append((kind, when, data))
+                                if kind == "down" and when >= ready:
+                                    if data == evdev.ecodes.KEY_F4 and not agent_key:
+                                        print("F4 requires OPENROUTER_API_KEY (loaded from ~/.bashrc by ./run).", flush=True)
+                                        continue
+                                    take = Take(when, key=data)
+                                    # Preserve ADC samples that arrived just before the key event.
+                                    buffered = list(recent)
+                                    remaining = []
+                                    while not events.empty():
+                                        remaining.append(events.get_nowait())
+                                    for event in buffered + remaining:
+                                        events.put_nowait(event)
+                                    print("RECORDING …", flush=True)
+                                    try:
+                                        if take.key == evdev.ecodes.KEY_F4:
+                                            try:
+                                                await agent_take(ws, events, take, args.chunk_ms, desktop, agent_key, overlay)
+                                            except (RuntimeError, OSError, TimeoutError, UnicodeError) as error:
+                                                print(f"F4 failed: {error}", flush=True)
+                                        else:
+                                            await capture_take(ws, events, take, args.chunk_ms, overlay)
+                                            await finish_take(take, desktop, latency_log)
+                                    except Exception as error:
+                                        # A failed take must not end the app; reconnect and stay usable.
+                                        app_log(f"recording failed: {type(error).__name__}: {error}")
+                                        print(f"Recording failed: {error}. Reconnecting …", flush=True)
+                                        break
+                                    for warning in take.warnings:
+                                        print("Deepgram warning:", warning.get("code", "unspecified"), flush=True)
+                                    break
+                        finally:
+                            listening[0] = False
+                            closed.cancel()
+                            with suppress(asyncio.CancelledError):
+                                await closed
+                except FatalError:
+                    raise
+                except Exception as error:
+                    app_log(f"connection failed: {type(error).__name__}: {error}")
+                    if args.once:
+                        raise
+                    print(f"Connection failed: {error}. Retrying in {delay:.0f} s.", flush=True)
+                    await asyncio.sleep(delay)
+                    delay = min(delay * 2, 30)
+                    continue
+                delay = 2.0
                 if args.once:
                     return
     finally:
@@ -282,8 +352,7 @@ def arguments():
     parser.add_argument("--device", help="PortAudio device name (list: .venv/bin/python -m sounddevice)")
     parser.add_argument("--once", action="store_true", help="Exit after one AltGr or F4 recording")
     parser.add_argument("--no-overlay", action="store_true", help="Disable the recording indicator")
-    state = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state")
-    parser.add_argument("--log", type=Path, default=state / "sound" / "latency.log",
+    parser.add_argument("--log", type=Path, default=state_directory() / "sound" / "latency.log",
                         help="Latency log: one number in milliseconds per successful dictation")
     return parser.parse_args()
 
@@ -294,4 +363,5 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\nStopped.")
     except Exception as error:
+        app_log("fatal: " + traceback.format_exc().strip().replace("\n", " | "))
         raise SystemExit(f"ERROR: {error}") from None

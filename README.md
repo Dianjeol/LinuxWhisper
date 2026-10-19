@@ -111,6 +111,8 @@ Quiet input leaves the bars at rest; louder input makes them taller. This is a s
 
 If you'd rather keep the screen clear, start with `./run --no-overlay`. If Quickshell cannot initialize, the app prints a startup warning and dictation remains available.
 
+If the indicator loses its connection to the recording observer, it hides and exits instead of leaving a stale recording surface behind. An unavailable observer socket at renderer startup also makes the renderer exit. A missing indicator is not confirmation of a successful dictation; the app must still be running and show **READY** before another recording.
+
 ## Useful options
 
 ```bash
@@ -181,6 +183,16 @@ The measurement is **Alt released → paste command acknowledged by Hyprland**. 
 
 The log contains no audio, transcripts, or API keys. Silence and failed handoffs produce no successful value. A log error can still occur after text has already been pasted. F4 values are not mixed into this AltGr log: generating the complete model answer is part of F4's actual waiting time and is not hidden by moving the measurement boundary.
 
+### Application log and connection recovery
+
+Startup, each fresh **READY**, idle reconnects, and failures are appended to:
+
+```text
+${XDG_STATE_HOME:-$HOME/.local/state}/linuxwhisper/app.log
+```
+
+This log is separate from the latency log and contains no audio, text selections, transcripts, API keys, or latency values. If Deepgram or the network closes the idle WebSocket, the app notices, opens a new connection, and returns to **READY** instead of exiting on the next recording. A failed recording is logged, its socket is replaced, and the process stays running. Local microphone or keyboard failures remain fatal and are recorded with a traceback.
+
 ## Optional autostart
 
 If you'd like the app to start when you sign in, and your checkout is at `~/Work/LinuxWhisper`, add this to `~/.config/hypr/autostart.lua`:
@@ -189,7 +201,7 @@ If you'd like the app to start when you sign in, and your checkout is at `~/Work
 o.launch_on_start(os.getenv("HOME") .. "/Work/LinuxWhisper/run")
 ```
 
-Adjust the path if your project is elsewhere. The API keys need to be available in the environment or through `~/.bashrc`. The app starts in the background at the next Hyprland session start, not when the configuration is reloaded. This is optional; the app does not make the change for you.
+Adjust the path if your project is elsewhere. The API keys need to be available in the environment or through `~/.bashrc`. The app starts in the background at the next Hyprland session start, not when the configuration is reloaded. Startup and failures are recorded in the [application log](#application-log-and-connection-recovery), which is the first place to check if an autostarted instance is not running. This is optional; the app does not make the change for you.
 
 ## Verification status
 
@@ -198,12 +210,32 @@ Adjust the path if your project is elsewhere. The API keys need to be available 
 
 These notes distinguish what has been checked from what still needs a real-world comparison. Development rules are in [AGENTS.md](AGENTS.md).
 
+### Autostart and idle-connection recovery
+
+- Checked the user journal for every boot from Oct 18 through Oct 19: `uwsm-app` launched `/home/david/Work/LinuxWhisper/run` at each Hyprland session start. The autostart entry itself was not the failure.
+- The app's systemd scope ended before the session in three of those boots: 2026-10-18 11:52:58 (2 h 27 min after launch), 2026-10-18 20:30:04 (3 h 16 min), and 2026-10-19 18:29:40 (31 min). The other scopes ended with their sessions. `coredumpctl` has no entry for the Python process, and the autostart scope did not capture its stdout/stderr; the original exception text is therefore not recoverable.
+- Added `${XDG_STATE_HOME:-$HOME/.local/state}/linuxwhisper/app.log` for startup, **READY**, reconnect, and error lines. It contains no audio, selections, transcripts, or API keys.
+- Forced a real EU Flux connection to close while idle by sending the unsupported `KeepAlive` text message: the running app logged `connection lost while idle; reconnecting`, opened a new connection, and printed **READY** again without exiting. A new regression test reproduces the same closure with a fake socket and asserts that the app keeps running.
+- An invalid Deepgram key produced logged `HTTP 401` retries with 2 s, 4 s, and 8 s backoff instead of an immediate exit.
+- A real `./run --no-overlay` reached **READY** against the EU endpoint and logged `ready`. `./run` was then started through the autostart path for normal use.
+- `.venv/bin/python -m unittest -v test_flow.py`: 9 tests passed.
+
 ### Setup and dependency check
 
 The documented Python installation was checked in a fresh, isolated virtual environment on Python 3.14.7. Installing only `requirements.txt` brought in all three direct dependencies, plus the automatically resolved `cffi` and `pycparser` dependencies. `pip check` reported no broken requirements.
 
 All application modules imported successfully in that environment. The CLI help, the documented audio-device listing, and `bash -n run` also passed. The required system packages and desktop commands were confirmed present; the `pacman` installation was not rerun. This documentation-only update did not change the app's behavior or repeat the dictation/latency checks below.
 
+
+### Stale recording indicator fix
+
+- Found a visible, orphaned Quickshell indicator while neither the dictation process nor its observer was running. Its log showed that the disconnect handler called the nonexistent `Quickshell.quit()`. The original dictation process's exit reason was not available in the journal; this fix does not claim to explain that exit.
+- The renderer now hides on socket disconnection/error and schedules the supported `Qt.quit()` for the next event-loop turn. Deferral also handles errors during QML construction, before the engine's quit receiver is connected. No audio, decoder-finalization, clipboard, paste, or latency-measurement code changed.
+- Exercised the actual Quickshell/Hyprland AltGr and F4 surfaces: show, idle/hide, show again, then close the observer socket. Both renderers exited with status 0 and left no layer surface. An unavailable socket at startup also exited cleanly. No quit-handler `TypeError` or unconnected-quit-signal warning remained.
+- Replayed a public speech WAV in real time through the main AltGr loop with injected PCM/key events, the production observer, real EU Deepgram, full `CloseStream` finalization, and the production clipboard/paste path. Separately verified insertion of the complete returned transcript at the caret between a prefix and suffix in native Chromium. Verified `Grüße, Jörg — 完全な文。` in that GUI field and byte-for-byte in a Foot terminal through its `terminal` tag / `Shift+Insert` path. Read the existing Omarchy history to confirm both texts; did not write its history file.
+- Injected silence and a microphone failure through the main loop: unchanged clipboard, no successful latency entry, and observer cleanup. The eight existing `test_flow` regression tests passed.
+- These checks used injected audio/key events, not physical speech/key presses. No comparable before/after latency group was collected, and no speedup or freedom from latency regressions is claimed.
+- Restarted the normal `./run` with the real microphone, physical keyboard device, recording observer/renderer, and EU Deepgram connection through **READY** after removing the temporary check files.
 
 ### Volume-reactive recording indicator
 
